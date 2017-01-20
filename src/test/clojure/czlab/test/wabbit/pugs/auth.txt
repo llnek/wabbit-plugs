@@ -1,0 +1,163 @@
+;;
+;; Licensed under the Apache License, Version 2.0 (the "License");
+;; you may not use this file except in compliance with the License.
+;; You may obtain a copy of the License at
+;;
+;;     http://www.apache.org/licenses/LICENSE-2.0
+;;
+;; Unless required by applicable law or agreed to in writing, software
+;; distributed under the License is distributed on an "AS IS" BASIS,
+;; WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+;; See the License for the specific language governing permissions and
+;; limitations under the License.
+;;
+;; Copyright (c) 2013-2016, Kenneth Leung. All rights reserved.
+;;
+
+
+
+(ns
+
+  testcljc.wabbit.auth
+
+  (:use [czlab.wabbit.auth.plugin]
+        [czlab.wabbit.auth.model]
+        [czlab.xlib.crypto.codec]
+        [czlab.xlib.util.core]
+        [czlab.xlib.dbio.drivers]
+        [czlab.xlib.dbio.connect]
+        [czlab.xlib.dbio.core]
+        [czlab.xlib.dbio.h2]
+        [clojure.test])
+
+  (:import  [com.zotohlab.wabbit.runtime AuthError UnknownUser]
+            [java.io File]
+            [com.zotohlab.frwk.crypto PasswordAPI]
+            [com.zotohlab.frwk.dbio Transactable SQLr MetaCache DBAPI]))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(def METAC (atom (MakeMetaCache (czlab.wabbit.auth.model.AuthPluginSchema.))))
+(def JDBC (atom nil))
+(def DB (atom nil))
+(def ROLES (atom nil))
+
+(defn init-test [f]
+  (let [ dir (File. (System/getProperty "java.io.tmpdir"))
+         db (str "" (System/currentTimeMillis))
+         url (MakeH2Db dir db "sa" (Pwdify ""))
+        jdbc (MakeJdbc (juid)
+               { :d H2-DRIVER :url url :user "sa" :passwd "" }
+               (Pwdify "")) ]
+    (reset! JDBC jdbc)
+    (ApplyAuthPluginDDL jdbc)
+    (reset! DB (DbioConnect jdbc @METAC {})))
+  (if (nil? f) nil (f))
+    )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn- create-roles []
+  (binding [ *META-CACHE* (.getMetaCache ^DBAPI @DB) ]
+    (let [ ^Transactable sql (.newCompositeSQLr ^DBAPI @DB) ]
+      (.execWith
+        sql
+        (fn [^SQLr tx]
+          (CreateAuthRole tx "Admin" "???")
+          (CreateAuthRole tx "User" "???")
+          (CreateAuthRole tx "Developer" "???")
+          (CreateAuthRole tx "Tester" "???")))
+      (let [ rs (.execWith
+                  sql
+                  (fn [^SQLr tx]
+                    (.findAll tx
+                              :czc.wabbit.auth/AuthRole
+                              {}))) ]
+                              ;;TODO
+                              ;;"order by role_name desc"))) ]
+        (== (count rs) 4)))))
+
+(defn- fetch-roles []
+  (binding [ *META-CACHE* (.getMetaCache ^DBAPI @DB) ]
+    (let [ ^Transactable sql (.newCompositeSQLr ^DBAPI @DB)
+           rs (.execWith
+                sql
+                (fn [^SQLr tx] (.findAll tx :czc.wabbit.auth/AuthRole ))) ]
+      (reduce (fn [sum r]
+                (assoc sum (:name r) r))
+              {}
+              (seq rs)))))
+
+(defn- create-acct []
+  (binding [ *META-CACHE* (.getMetaCache ^DBAPI @DB) ]
+    (let [ ^Transactable sql (.newCompositeSQLr ^DBAPI @DB)
+           ros (fetch-roles)
+           u (.execWith
+               sql
+               (fn [^SQLr tx]
+                 (CreateLoginAccount tx "joeb" (Pwdify "hi")
+                                     {}
+                                     [ (get ros "User") ] )))
+           rc (.execWith
+                sql
+                (fn [^SQLr tx]
+                  (DbioGetM2M {:as :roles :with tx} u))) ]
+      (== (count rc) 1))))
+
+(defn- load-acct-nouser []
+  (binding [ *META-CACHE* (.getMetaCache ^DBAPI @DB) ]
+    (let [ ^Transactable sql (.newCompositeSQLr ^DBAPI @DB) ]
+      (try
+        (.execWith
+          sql
+          (fn [^SQLr tx]
+            (GetLoginAccount tx "xxxxx" "7soiwqhfasfhals")))
+        false
+        (catch UnknownUser e#
+          true)))))
+
+(defn- load-acct-badpwd [user]
+  (binding [ *META-CACHE* (.getMetaCache ^DBAPI @DB) ]
+    (let [ ^Transactable sql (.newCompositeSQLr ^DBAPI @DB) ]
+      (try
+        (.execWith
+          sql
+          (fn [^SQLr tx]
+            (GetLoginAccount tx user "7soiwqhfasfhals")))
+        false
+        (catch AuthError e#
+          true)))))
+
+(defn- load-acct-ok [user pwd]
+  (binding [ *META-CACHE* (.getMetaCache ^DBAPI @DB) ]
+    (let [ ^Transactable sql (.newCompositeSQLr ^DBAPI @DB)
+           u (.execWith
+               sql
+               (fn [^SQLr tx]
+                 (GetLoginAccount tx user pwd))) ]
+      (not (nil? u)))))
+
+(deftest testwabbit.auth
+
+  (is (do (init-test nil) true))
+
+  (is (create-roles))
+  (is (create-acct))
+  (is (load-acct-ok "joeb" "hi"))
+  (is (load-acct-nouser))
+  (is (load-acct-badpwd "joeb"))
+)
+
+
+
+;;(use-fixtures :each init-test)
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+(def ^:private auth-eof nil)
+
+;;(clojure.test/run-tests 'testcljc.wabbit.auth)
+
+
