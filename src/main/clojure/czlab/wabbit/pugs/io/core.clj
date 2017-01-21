@@ -9,24 +9,22 @@
 (ns ^{:doc "Core functions for all IO services."
       :author "Kenneth Leung"}
 
-  czlab.wabbit.io.core
+  czlab.wabbit.pugs.io.core
 
-  (:require [czlab.xlib.meta :refer [getCldr]]
-            [czlab.xlib.logging :as log])
+  (:require [czlab.basal.meta :refer [getCldr]]
+            [czlab.basal.logging :as log])
 
   (:use [czlab.wabbit.base.core]
-        [czlab.xlib.consts]
-        [czlab.xlib.core]
-        [czlab.xlib.str]
+        [czlab.basal.consts]
+        [czlab.basal.core]
+        [czlab.basal.str]
         [czlab.flux.wflow.core])
 
-  (:import [czlab.wabbit.io IoTrigger IoService IoEvent]
+  (:import [czlab.wabbit.ctl Pluggable Puglet PugEvent]
+           [czlab.jasal Triggerable]
            [czlab.flux.wflow WorkStream Job TaskDef]
            [java.util Timer TimerTask]
-           [czlab.wabbit.server
-            Cljshim
-            Container]
-           [czlab.wabbit.pugs Pluggable]))
+           [czlab.wabbit.sys Cljshim Container]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;(set! *warn-on-reflection* true)
@@ -66,7 +64,7 @@
 (defn dispatch!
   ""
   ([evt] (dispatch! evt nil))
-  ([^IoEvent evt arg]
+  ([^PugEvent evt arg]
    (log/debug "[%s] event is disp!" (.id (.source evt)))
    (let
      [src (.source evt)
@@ -95,65 +93,6 @@
          (throwBadArg "Want WorkStream, got %s" (class wf)))
        (catch Throwable _
          (error! src job _))))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-(defn service<>
-  "Create a IO/Service"
-  ^IoService
-  [^Container parObj
-   emType
-   emAlias
-   {:keys [info conf] :as spec}]
-  (let [timer (atom nil)
-        impl (atom nil)]
-    (with-meta
-      (reify IoService
-        (setParent [_ p] (throwUOE "can't setParent"))
-        (getx [_] (throwUOE "can't getx"))
-        (isEnabled [_]
-          (not (false? (:enabled? (.config ^Pluggable @impl)))))
-        (server [this] (.parent this))
-        (config [_] (.config ^Pluggable @impl))
-        (hold [_ trig millis]
-          (if (and (some? @timer)
-                   (spos? millis))
-            (let [k (tmtask<>
-                      #(.fire trig nil))]
-              (.schedule ^Timer @timer k millis)
-              (.setTrigger trig k))))
-        (version [_] (str (:version info)))
-        (id [_] emAlias)
-        (parent [_] parObj)
-        (dispose [_]
-          (log/info "io-service [%s] is being disposed" emAlias)
-          (some-> ^Timer @timer (.cancel))
-          (rset! timer)
-          (.dispose ^Pluggable @impl)
-          (log/info "io-service [%s] disposed - ok" emAlias))
-        (init [this cfg0]
-          (log/info "io-service [%s] is initializing..." emAlias)
-          (let [c (-> (.cljrt parObj)
-                      (.callEx (strKW emType)
-                               (vargs* Object this spec)))]
-            (rset! impl c)
-            (.init ^Pluggable c cfg0))
-          (log/info "io-service [%s] init'ed - ok" emAlias))
-        (start [this arg]
-          (log/info "io-service [%s] is starting..." emAlias)
-          (rset! timer (Timer. true))
-          (.start ^Pluggable @impl arg)
-          (log/info "io-service [%s] config:" emAlias)
-          (log/info "%s" (pr-str (.config this)))
-          (log/info "io-service [%s] started - ok" emAlias))
-        (stop [_]
-          (log/info "io-service [%s] is stopping..." emAlias)
-          (some-> ^Timer @timer (.cancel))
-          (rset! timer)
-          (.stop ^Pluggable @impl)
-          (log/info "io-service [%s] stopped - ok" emAlias)))
-
-      {:typeid emType})))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF

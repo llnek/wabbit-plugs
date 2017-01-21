@@ -9,17 +9,17 @@
 (ns ^{:doc ""
       :author "Kenneth Leung"}
 
-  czlab.wabbit.jmx.bean
+  czlab.wabbit.pugs.jmx.bean
 
-  (:require [czlab.xlib.logging :as log])
+  (:require [czlab.basal.logging :as log])
 
-  (:use [czlab.xlib.meta]
-        [czlab.xlib.core]
-        [czlab.xlib.str])
+  (:use [czlab.basal.meta]
+        [czlab.basal.core]
+        [czlab.basal.str])
 
   (:import [java.lang Exception IllegalArgumentException]
            [java.lang.reflect Field Method]
-           [czlab.wabbit.pugs NameParams]
+           [czlab.wabbit.pugs.jmx NameParams]
            [javax.management
             AttributeList
             Attribute
@@ -32,7 +32,7 @@
             ReflectionException
             AttributeNotFoundException]
            [java.util Arrays]
-           [czlab.xlib Muble]))
+           [czlab.jasal Muble]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;(set! *warn-on-reflection* true)

@@ -8,12 +8,12 @@
  * You must not remove this notice, or any other, from this software.
  */
 
-package czlab.wabbit.pugs;
+package czlab.wabbit.pugs.auth;
 
 /**
  * @author Kenneth Leung
  */
-public class ExpiredError extends Exception {
+public class ExpiredError extends AuthError {
 
   private static final long serialVersionUID = 1L;
 

@@ -8,15 +8,16 @@
  * You must not remove this notice, or any other, from this software.
  */
 
-package czlab.wabbit.io;
+package czlab.wabbit.pugs.io;
 
+import czlab.wabbit.ctl.PugEvent;
 import java.io.InputStream;
 import java.io.OutputStream;
 
 /**
  * @author Kenneth Leung
  */
-public interface SocketEvent extends IoEvent {
+public interface SocketEvent extends PugEvent {
 
   /**/
   public OutputStream sockOut();

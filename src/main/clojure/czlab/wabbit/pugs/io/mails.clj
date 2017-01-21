@@ -9,18 +9,18 @@
 (ns ^{:doc "Implementation for email services."
       :author "Kenneth Leung"}
 
-  czlab.wabbit.io.mails
+  czlab.wabbit.pugs.io.mails
 
   (:require [czlab.twisty.codec :refer [passwd<>]]
-            [czlab.xlib.logging :as log])
+            [czlab.basal.logging :as log])
 
-  (:use [czlab.wabbit.io.loops]
+  (:use [czlab.wabbit.pugs.io.loops]
         [czlab.wabbit.base.core]
-        [czlab.xlib.core]
-        [czlab.xlib.str]
-        [czlab.wabbit.io.core])
+        [czlab.basal.core]
+        [czlab.basal.str]
+        [czlab.wabbit.pugs.io.core])
 
-  (:import [czlab.wabbit.io IoService EmailEvent]
+  (:import [czlab.wabbit.pugs.io EmailEvent]
            [javax.mail.internet MimeMessage]
            [javax.mail
             Flags$Flag
@@ -30,10 +30,10 @@
             Session
             Provider
             Provider$Type]
-           [czlab.wabbit.server Container]
+           [czlab.wabbit.sys Container]
            [java.util Properties]
            [java.io IOException]
-           [czlab.wabbit.pugs Pluggable]))
+           [czlab.wabbit.ctl Puglet Pluggable]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;(set! *warn-on-reflection* true)
@@ -72,7 +72,7 @@
 ;;
 (defn- closeStore
   ""
-  [^IoService co]
+  [^Puglet co]
   (let [{:keys [store folder]}
         (.intern (.getx co))]
     (closeFolder folder)
@@ -87,7 +87,7 @@
 ;;
 (defn- resolveProvider
   ""
-  [^IoService co ^String cz ^String proto]
+  [^Puglet co ^String cz ^String proto]
   (let
     [mockp (sysProp "wabbit.mock.mail.proto")
      demo? (hgl? mockp)
@@ -118,7 +118,7 @@
 ;;
 (defn- evt<>
   ""
-  [^IoService co {:keys [msg]}]
+  [^Puglet co {:keys [msg]}]
   (let [eeid (str "event#" (seqint2))]
     (with-meta
       (reify EmailEvent
@@ -132,7 +132,7 @@
 ;;
 (defn- connectPop3
   ""
-  [^IoService co]
+  [^Puglet co]
   (let [{:keys [^Session session
                 ^String proto]}
         (.intern (.getx co))
@@ -163,7 +163,7 @@
 ;;
 (defn- readPop3
   ""
-  [^IoService co msgs]
+  [^Puglet co msgs]
   (let [d? (.getv (.getx co) :deleteMsg?)]
     (doseq [^MimeMessage mm  msgs]
       (doto mm
@@ -176,7 +176,7 @@
 ;;
 (defn- scanPop3
   ""
-  [^IoService co]
+  [^Puglet co]
   (let [{:keys [^Folder folder ^Store store]}
         (.config co)]
     (if (and (some? folder)
@@ -196,7 +196,7 @@
 ;;
 (defn- wake<o>
   ""
-  [^IoService co]
+  [^Puglet co]
   (try
     (connectPop3 co)
     (scanPop3 co)

@@ -9,43 +9,43 @@
 (ns ^{:doc ""
       :author "Kenneth Leung"}
 
-  czlab.wabbit.auth.core
+  czlab.wabbit.pugs.auth.core
 
-  (:require [czlab.xlib.format :refer [readEdn readJsonStr writeJsonStr]]
+  (:require [czlab.basal.format :refer [readEdn readJsonStr writeJsonStr]]
             [czlab.twisty.codec :refer [caesarDecrypt passwd<>]]
             [czlab.convoy.net.util :refer [filterFormFields]]
             [czlab.wabbit.io.http :refer [scanBasicAuth]]
             [czlab.horde.dbio.connect :refer [dbopen<+>]]
-            [czlab.xlib.resources :refer [rstr]]
+            [czlab.basal.resources :refer [rstr]]
             [clojure.string :as cs]
             [clojure.java.io :as io]
-            [czlab.xlib.logging :as log])
+            [czlab.basal.logging :as log])
 
-  (:use [czlab.wabbit.base.core]
-        [czlab.wabbit.auth.model]
-        [czlab.wabbit.auth.core]
+  (:use [czlab.wabbit.pugs.auth.model]
+        [czlab.wabbit.pugs.auth.core]
+        [czlab.wabbit.pugs.mvc.web]
+        [czlab.wabbit.base.core]
         [czlab.convoy.net.core]
-        [czlab.wabbit.mvc.web]
-        [czlab.xlib.core]
-        [czlab.xlib.io]
-        [czlab.xlib.meta]
-        [czlab.xlib.str]
+        [czlab.basal.core]
+        [czlab.basal.io]
+        [czlab.basal.meta]
+        [czlab.basal.str]
         [czlab.horde.dbio.core])
 
   (:import [org.apache.shiro.authc.credential CredentialsMatcher]
            [czlab.convoy.net HttpResult ULFormItems ULFileItem]
            [org.apache.shiro.config IniSecurityManagerFactory]
            [org.apache.shiro.authc UsernamePasswordToken]
-           [czlab.xlib XData Muble I18N BadDataError]
+           [czlab.jasal XData Muble I18N BadDataError]
            [org.apache.shiro.realm AuthorizingRealm]
            [org.apache.shiro.subject Subject]
            [java.util Base64 Base64$Decoder]
            [org.apache.shiro SecurityUtils]
-           [czlab.wabbit.server Container]
+           [czlab.wabbit.sys Container]
            [czlab.wabbit.base ConfigError]
            [clojure.lang APersistentMap]
            [java.io File IOException]
-           [czlab.wabbit.io HttpEvent]
+           [czlab.wabbit.pugs.io HttpEvent]
            [org.apache.shiro.authz
             AuthorizationException
             AuthorizationInfo]
@@ -62,13 +62,12 @@
             If
             Job
             Script]
-           [czlab.wabbit.pugs
-            Pluggable
+           [czlab.wabbit.pugs.auth
             AuthPlugin
             AuthError
-            PluginError
             UnknownUser
             DuplicateUser]
+           [czlab.wabbit.ctl Pluggable PugError]
            [czlab.horde
             DbApi
             Schema

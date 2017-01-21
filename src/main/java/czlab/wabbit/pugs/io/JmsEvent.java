@@ -8,14 +8,15 @@
  * You must not remove this notice, or any other, from this software.
  */
 
-package czlab.wabbit.io;
+package czlab.wabbit.pugs.io;
 
+import czlab.wabbit.ctl.PugEvent;
 import javax.jms.Message;
 
 /**
  * @author Kenneth Leung
  */
-public interface JmsEvent extends IoEvent {
+public interface JmsEvent extends PugEvent {
 
   /**
    */

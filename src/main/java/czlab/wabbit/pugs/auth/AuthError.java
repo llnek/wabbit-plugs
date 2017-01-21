@@ -8,12 +8,14 @@
  * You must not remove this notice, or any other, from this software.
  */
 
-package czlab.wabbit.pugs;
+package czlab.wabbit.pugs.auth;
+
+import czlab.wabbit.ctl.PugError;
 
 /**
  * @author Kenneth Leung
  */
-public class AuthError extends Exception {
+public class AuthError extends PugError {
 
   private static final long serialVersionUID = 1L;
 

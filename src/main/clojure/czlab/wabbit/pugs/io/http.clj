@@ -9,13 +9,13 @@
 (ns ^{:doc "Implementation for HTTP/MVC service."
       :author "Kenneth Leung"}
 
-  czlab.wabbit.io.http
+  czlab.wabbit.pugs.io.http
 
   (:require [czlab.convoy.net.util :refer [parseBasicAuth]]
-            [czlab.xlib.io :refer [xdata<> slurpUtf8]]
-            [czlab.xlib.format :refer [readEdn]]
+            [czlab.basal.io :refer [xdata<> slurpUtf8]]
+            [czlab.basal.format :refer [readEdn]]
             [czlab.twisty.codec :refer [passwd<>]]
-            [czlab.xlib.logging :as log]
+            [czlab.basal.logging :as log]
             [clojure.java.io :as io]
             [clojure.string :as cs])
 
@@ -26,11 +26,11 @@
         [czlab.convoy.netty.core]
         [czlab.convoy.net.core]
         [czlab.flux.wflow.core]
-        [czlab.wabbit.io.core]
+        [czlab.wabbit.pugs.io.core]
         [czlab.twisty.ssl]
-        [czlab.xlib.core]
-        [czlab.xlib.str]
-        [czlab.xlib.meta])
+        [czlab.basal.core]
+        [czlab.basal.str]
+        [czlab.basal.meta])
 
   (:import [czlab.convoy.net HttpResult RouteCracker RouteInfo]
            [czlab.convoy.netty WholeRequest InboundHandler]
@@ -48,8 +48,8 @@
            [io.netty.buffer ByteBuf Unpooled]
            [io.netty.handler.ssl SslHandler]
            [czlab.flux.wflow Job]
-           [czlab.wabbit.server Container]
-           [czlab.wabbit.io IoService IoEvent]
+           [czlab.wabbit.sys Container]
+           [czlab.wabbit.ctl Pluggable Puglet PugEvent]
            [clojure.lang Atom APersistentMap]
            [czlab.twisty IPassword]
            [java.util Timer TimerTask]
@@ -82,9 +82,7 @@
             InetAddress
             SocketAddress
             InetSocketAddress]
-           [czlab.wabbit.io
-            HttpEvent
-            WSockEvent]
+           [czlab.wabbit.pugs.io HttpEvent WSockEvent]
            [io.netty.channel
             Channel
             ChannelHandler
@@ -97,8 +95,7 @@
             ChunkedStream
             ChunkedFile
             ChunkedInput
-            ChunkedWriteHandler]
-           [czlab.wabbit.pugs Pluggable]))
+            ChunkedWriteHandler]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;(set! *warn-on-reflection* true)

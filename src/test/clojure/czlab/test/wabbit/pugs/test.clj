@@ -6,20 +6,19 @@
 ;; the terms of this license.
 ;; You must not remove this notice, or any other, from this software.
 
-(ns czlab.test.wabbit.test
+(ns czlab.test.wabbit.pugs.test
 
-  (:require [czlab.xlib.logging :as log]
+  (:require [czlab.basal.logging :as log]
             [clojure.string :as cs]
             [clojure.java.io :as io])
 
   (:use [czlab.wabbit.cons.con1]
         [czlab.wabbit.cons.con2]
-        [czlab.wabbit.cons.con8]
-        [czlab.wabbit.cons.core]
-        [czlab.wabbit.common.core]
-        [czlab.xlib.core]
-        [czlab.xlib.io]
-        [czlab.xlib.str]
+        [czlab.wabbit.cons.con7]
+        [czlab.wabbit.base.core]
+        [czlab.basal.core]
+        [czlab.basal.io]
+        [czlab.basal.str]
         [clojure.test])
 
   (:import [czlab.wabbit.cons CmdError]
@@ -27,7 +26,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(deftest czlabtestwabbit-test
+(deftest czlabtestwabbitpugs-test
 
   (is (= "hello"
          (gtid (with-meta {:a 1} {:typeid "hello"}))))
@@ -147,5 +146,6 @@
 
   (is (string? "That's all folks!")))
 
-;;(clojure.test/run-tests 'czlab.test.wabbit.test)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;EOF
 

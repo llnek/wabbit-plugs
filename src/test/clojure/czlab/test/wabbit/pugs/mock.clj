@@ -9,36 +9,35 @@
 (ns ^{:doc ""
       :author "Kenneth Leung"}
 
-  czlab.test.wabbit.mock
+  czlab.test.wabbit.pugs.mock
 
-  (:require [czlab.xlib.scheduler :refer [scheduler<>]]
-            [czlab.xlib.meta :refer [getCldr]]
-            [czlab.xlib.logging :as log]
+  (:require [czlab.basal.scheduler :refer [scheduler<>]]
+            [czlab.basal.meta :refer [getCldr]]
+            [czlab.basal.logging :as log]
             [clojure.string :as cs]
             [clojure.java.io :as io])
 
-  (:use [czlab.wabbit.common.core]
-        [czlab.wabbit.etc.core]
-        [czlab.xlib.core]
-        [czlab.xlib.str]
-        [czlab.xlib.io]
-        [czlab.wabbit.io.core]
-        [czlab.wabbit.io.loops]
-        [czlab.wabbit.io.mails]
-        [czlab.wabbit.io.files]
-        [czlab.wabbit.io.jms]
-        [czlab.wabbit.io.http]
-        [czlab.wabbit.io.socket])
+  (:use [czlab.wabbit.base.core]
+        [czlab.basal.core]
+        [czlab.basal.str]
+        [czlab.basal.io]
+        [czlab.wabbit.pugs.io.core]
+        [czlab.wabbit.pugs.io.loops]
+        [czlab.wabbit.pugs.io.mails]
+        [czlab.wabbit.pugs.io.files]
+        [czlab.wabbit.pugs.io.jms]
+        [czlab.wabbit.pugs.io.http]
+        [czlab.wabbit.pugs.io.socket])
 
-  (:import [czlab.wabbit.etc Gist]
-           [czlab.wabbit.server
+  (:import [czlab.wabbit.base Gist]
+           [czlab.wabbit.sys
             Execvisor
             Cljshim
             Container]
-           [czlab.xlib
+           [czlab.jasal
             Activable
             Schedulable]
-           [czlab.wabbit.io IoEvent]))
+           [czlab.wabbit.ctl PugEvent]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;(set! *warn-on-reflection* true)

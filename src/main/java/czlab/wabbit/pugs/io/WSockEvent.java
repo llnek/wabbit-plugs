@@ -8,14 +8,15 @@
  * You must not remove this notice, or any other, from this software.
  */
 
-package czlab.wabbit.io;
+package czlab.wabbit.pugs.io;
 
+import czlab.wabbit.ctl.PugEvent;
 import czlab.xlib.XData;
 
 /**
  * @author Kenneth Leung
  */
-public interface WSockEvent extends IoEvent {
+public interface WSockEvent extends PugEvent {
 
   /**/
   public boolean isBinary();

@@ -8,10 +8,11 @@
  * You must not remove this notice, or any other, from this software.
  */
 
-package czlab.wabbit.pugs;
+package czlab.wabbit.pugs.jmx;
 
 import javax.management.ObjectName;
-import czlab.xlib.Resetable;
+import czlab.jasal.Resetable;
+import czlab.wabbit.ctl.Pluggable;
 
 /**
  * @author Kenneth Leung

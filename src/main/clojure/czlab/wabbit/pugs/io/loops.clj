@@ -9,22 +9,22 @@
 (ns ^{:doc "Basic functions for loopable services."
       :author "Kenneth Leung"}
 
-  czlab.wabbit.io.loops
+  czlab.wabbit.pugs.io.loops
 
-  (:require [czlab.xlib.dates :refer [parseDate]]
-            [czlab.xlib.process :refer [async!]]
-            [czlab.xlib.meta :refer [getCldr]]
-            [czlab.xlib.logging :as log])
+  (:require [czlab.basal.dates :refer [parseDate]]
+            [czlab.basal.process :refer [async!]]
+            [czlab.basal.meta :refer [getCldr]]
+            [czlab.basal.logging :as log])
 
   (:use [czlab.wabbit.base.core]
-        [czlab.xlib.core]
-        [czlab.xlib.str]
-        [czlab.wabbit.io.core])
+        [czlab.basal.core]
+        [czlab.basal.str]
+        [czlab.wabbit.pugs.io.core])
 
-  (:import [czlab.wabbit.io IoService TimerEvent]
+  (:import [czlab.wabbit.pugs.io TimerEvent]
            [java.util Date Timer TimerTask]
            [clojure.lang APersistentMap]
-           [czlab.wabbit.pugs Pluggable]))
+           [czlab.wabbit.ctl Puglet Pluggable]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;(set! *warn-on-reflection* true)

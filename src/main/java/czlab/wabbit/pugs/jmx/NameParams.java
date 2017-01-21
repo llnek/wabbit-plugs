@@ -8,7 +8,7 @@
  * You must not remove this notice, or any other, from this software.
  */
 
-package czlab.wabbit.pugs;
+package czlab.wabbit.pugs.jmx;
 
 import java.util.Arrays;
 

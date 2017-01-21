@@ -8,14 +8,15 @@
  * You must not remove this notice, or any other, from this software.
  */
 
-package czlab.wabbit.io;
+package czlab.wabbit.pugs.io;
 
+import czlab.wabbit.ctl.PugEvent;
 import java.io.File;
 
 /**
  * @author Kenneth Leung
  */
-public interface FileEvent extends IoEvent {
+public interface FileEvent extends PugEvent {
 
   /**
    */

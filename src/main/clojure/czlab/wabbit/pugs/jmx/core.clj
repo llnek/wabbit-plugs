@@ -9,23 +9,24 @@
 (ns ^{:doc ""
       :author "Kenneth Leung"}
 
-  czlab.wabbit.jmx.core
+  czlab.wabbit.pugs.jmx.core
 
-  (:require [czlab.xlib.logging :as log]
+  (:require [czlab.basal.logging :as log]
             [clojure.string :as cs])
 
-  (:use [czlab.wabbit.jmx.bean]
-        [czlab.xlib.core]
-        [czlab.xlib.str])
+  (:use [czlab.wabbit.pugs.jmx.bean]
+        [czlab.basal.core]
+        [czlab.basal.str])
 
   (:import [java.net InetAddress MalformedURLException]
            [java.rmi.registry LocateRegistry Registry]
-           [czlab.wabbit.pugs Pluggable JmxPlugin]
+           [czlab.wabbit.pugs.jmx JmxPlugin]
+           [czlab.wabbit.ctl Pluggable]
            [java.lang.management ManagementFactory]
            [java.rmi.server UnicastRemoteObject]
            [java.rmi NoSuchObjectException]
-           [czlab.wabbit.server Container]
-           [czlab.xlib Muble]
+           [czlab.wabbit.sys Container]
+           [czlab.jasal Muble]
            [java.util HashMap]
            [javax.management.remote
             JMXConnectorServer

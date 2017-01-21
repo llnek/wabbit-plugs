@@ -9,18 +9,18 @@
 (ns ^{:doc "Implementation for JMS service."
       :author "Kenneth Leung" }
 
-  czlab.wabbit.io.jms
+  czlab.wabbit.pugs.io.jms
 
   (:require [czlab.twisty.codec :refer [passwd<>]]
-            [czlab.xlib.logging :as log])
+            [czlab.basal.logging :as log])
 
   (:use [czlab.wabbit.base.core]
-        [czlab.xlib.core]
-        [czlab.xlib.str]
-        [czlab.wabbit.io.core])
+        [czlab.basal.core]
+        [czlab.basal.str]
+        [czlab.wabbit.pugs.io.core])
 
   (:import [java.util Hashtable Properties ResourceBundle]
-           [czlab.wabbit.pugs Pluggable]
+           [czlab.wabbit.ctl Puglet Pluggable]
            [javax.jms
             ConnectionFactory
             Connection
@@ -42,8 +42,8 @@
             TopicSubscriber]
            [java.io IOException]
            [javax.naming Context InitialContext]
-           [czlab.wabbit.server Container]
-           [czlab.wabbit.io IoService JmsEvent]))
+           [czlab.wabbit.sys Container]
+           [czlab.wabbit.pugs.io JmsEvent]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;(set! *warn-on-reflection* true)
@@ -76,7 +76,7 @@
 (defn- inizFac
   ""
   ^Connection
-  [^IoService co ^InitialContext ctx ^ConnectionFactory cf]
+  [^Puglet co ^InitialContext ctx ^ConnectionFactory cf]
   (let
     [{:keys [^String destination
              ^String jmsPwd
@@ -108,7 +108,7 @@
 (defn- inizTopic
   ""
   ^Connection
-  [^IoService co ^InitialContext ctx ^TopicConnectionFactory cf]
+  [^Puglet co ^InitialContext ctx ^TopicConnectionFactory cf]
   (let
     [{:keys [^String destination
              ^String jmsUser
@@ -142,7 +142,7 @@
 (defn- inizQueue
   ""
   ^Connection
-  [^IoService co ^InitialContext ctx ^QueueConnectionFactory cf]
+  [^Puglet co ^InitialContext ctx ^QueueConnectionFactory cf]
   (let
     [{:keys [^String destination
              ^String jmsUser
@@ -220,7 +220,7 @@
   ^Pluggable
   [co {:keys [conf] :as spec}]
   (let
-    [pkey (.podKey (.server ^IoService co))
+    [pkey (.podKey (.server ^Puglet co))
      cee (keyword (juid))
      impl (muble<>)]
     (reify

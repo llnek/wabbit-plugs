@@ -8,14 +8,15 @@
  * You must not remove this notice, or any other, from this software.
  */
 
-package czlab.wabbit.io;
+package czlab.wabbit.pugs.io;
 
 import javax.mail.internet.MimeMessage;
+import czlab.wabbit.ctl.PugEvent;
 
 /**
  * @author Kenneth Leung
  */
-public interface EmailEvent extends IoEvent {
+public interface EmailEvent extends PugEvent {
 
   /**
    */

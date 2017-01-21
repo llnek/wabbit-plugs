@@ -8,12 +8,14 @@
  * You must not remove this notice, or any other, from this software.
  */
 
-package czlab.wabbit.io;
+package czlab.wabbit.pugs.io;
+
+import czlab.wabbit.ctl.PugEvent;
 
 /**
  * @author Kenneth Leung
  */
-public interface TimerEvent extends IoEvent {
+public interface TimerEvent extends PugEvent {
 
   /**/
   public boolean isRepeating();

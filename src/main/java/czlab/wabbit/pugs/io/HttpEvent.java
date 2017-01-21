@@ -8,14 +8,16 @@
  * You must not remove this notice, or any other, from this software.
  */
 
-package czlab.wabbit.io;
+package czlab.wabbit.pugs.io;
 
 import czlab.convoy.net.HttpInvoke;
+import czlab.wabbit.ctl.PugEvent;
+import czlab.jasal.Triggerable;
 
 /**
  * @author Kenneth Leung
  */
-public interface HttpEvent extends IoEvent, IoTrigger, HttpInvoke {
+public interface HttpEvent extends PugEvent, Triggerable, HttpInvoke {
 
 
 }

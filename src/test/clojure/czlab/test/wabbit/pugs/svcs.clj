@@ -6,9 +6,9 @@
 ;; the terms of this license.
 ;; You must not remove this notice, or any other, from this software.
 
-(ns czlab.test.wabbit.svcs
+(ns czlab.test.wabbit.pugs.svcs
 
-  (:require [czlab.xlib.logging :as log]
+  (:require [czlab.basal.logging :as log]
             [clojure.string :as cs]
             [clojure.java.io :as io])
 
@@ -16,19 +16,18 @@
         [czlab.convoy.net.core]
         ;;[czlab.convoy.netty.resp]
         [czlab.test.wabbit.mock]
-        [czlab.wabbit.common.svcs]
-        [czlab.wabbit.common.core]
+        [czlab.wabbit.shared.svcs]
+        [czlab.wabbit.base.core]
         [czlab.wabbit.cons.core]
-        [czlab.wabbit.etc.core]
-        [czlab.wabbit.io.core]
+        [czlab.wabbit.pugs.io.core]
         [czlab.flux.wflow.core]
-        [czlab.xlib.core]
-        [czlab.xlib.io]
-        [czlab.xlib.str]
+        [czlab.basal.core]
+        [czlab.basal.io]
+        [czlab.basal.str]
         [clojure.test])
 
   (:import [java.io DataOutputStream DataInputStream BufferedInputStream]
-           [czlab.wabbit.io
+           [czlab.wabbit.pugs.io
             EmailEvent
             SocketEvent
             FileEvent
@@ -36,7 +35,7 @@
             HttpEvent]
            [czlab.flux.wflow WorkStream Job]
            [io.netty.channel Channel]
-           [czlab.wabbit.server Container]
+           [czlab.wabbit.sys Container]
            [javax.mail Message Message$RecipientType Multipart]
            [javax.mail.internet MimeMessage]
            [javax.jms TextMessage]
@@ -144,16 +143,16 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(deftest czlabtestwabbit-svcs
+(deftest czlabtestwabbitpugs-svcs
 
-  (is (let [etype :czlab.wabbit.io.http/HTTP
+  (is (let [etype :czlab.wabbit.pugs.io.http/HTTP
             m (emitterByService etype)
             c (:conf m)
             ^Container
             ctr (mock :container)
             s (service<> ctr etype "t" c)]
         (.init s
-               {:handler "czlab.test.wabbit.svcs/httpHandler"
+               {:handler "czlab.test.wabbit.pugs.svcs/httpHandler"
                 :host "localhost"
                 :port 8888})
         (.start s nil)
@@ -169,7 +168,7 @@
           (= "hello" z))))
 
   (is (let [_ (sysProp! "wabbit.mock.mail.proto" "imaps")
-            etype :czlab.wabbit.io.mails/IMAP
+            etype :czlab.wabbit.pugs.io.mails/IMAP
             m (emitterByService etype)
             c (:conf m)
             ^Container
@@ -177,7 +176,7 @@
             s (service<> ctr etype "t" c)]
         (reset! result-var 0)
         (.init s
-               {:handler "czlab.test.wabbit.svcs/mailHandler"
+               {:handler "czlab.test.wabbit.pugs.svcs/mailHandler"
                 :host "localhost"
                 :port 7110
                 :intervalSecs 1
@@ -190,7 +189,7 @@
         (> @result-var 8)))
 
   (is (let [_ (sysProp! "wabbit.mock.mail.proto" "pop3s")
-            etype :czlab.wabbit.io.mails/POP3
+            etype :czlab.wabbit.pugs.io.mails/POP3
             m (emitterByService etype)
             c (:conf m)
             ^Container
@@ -198,7 +197,7 @@
             s (service<> ctr etype "t" c)]
         (reset! result-var 0)
         (.init s
-               {:handler "czlab.test.wabbit.svcs/mailHandler"
+               {:handler "czlab.test.wabbit.pugs.svcs/mailHandler"
                 :host "localhost"
                 :port 7110
                 :intervalSecs 1
@@ -211,16 +210,16 @@
         (> @result-var 8)))
 
   (is (let [_ (sysProp! "wabbit.mock.jms.loopsecs" "1")
-            etype :czlab.wabbit.io.jms/JMS
+            etype :czlab.wabbit.pugs.io.jms/JMS
             m (emitterByService etype)
             c (assoc (:conf m)
-                     :contextFactory "czlab.wabbit.mock.jms.MockContextFactory"
+                     :contextFactory "czlab.proto.mock.jms.MockContextFactory"
                      :providerUrl "java://aaa"
                      ;;:connFactory "tcf"
                      ;;:destination "topic.abc"
                      :connFactory "qcf"
                      :destination "queue.xyz"
-                     :handler "czlab.test.wabbit.svcs/jmsHandler")
+                     :handler "czlab.test.wabbit.pugs.svcs/jmsHandler")
             ^Container
             ctr (mock :container)
             s (service<> ctr etype "t" c)]
@@ -237,16 +236,16 @@
         (> @result-var 8)))
 
   (is (let [_ (sysProp! "wabbit.mock.jms.loopsecs" "1")
-            etype :czlab.wabbit.io.jms/JMS
+            etype :czlab.wabbit.pugs.io.jms/JMS
             m (emitterByService etype)
             c (assoc (:conf m)
-                     :contextFactory "czlab.wabbit.mock.jms.MockContextFactory"
+                     :contextFactory "czlab.proto.mock.jms.MockContextFactory"
                      :providerUrl "java://aaa"
                      ;;:connFactory "tcf"
                      ;;:destination "topic.abc"
                      :connFactory "qcf"
                      :destination "queue.xyz"
-                     :handler "czlab.test.wabbit.svcs/jmsHandler")
+                     :handler "czlab.test.wabbit.pugs.svcs/jmsHandler")
             ^Container
             ctr (mock :container)
             s (service<> ctr etype "t" c)]
@@ -262,14 +261,14 @@
         (.dispose ctr)
         (> @result-var 8)))
 
-  (is (let [etype :czlab.wabbit.io.socket/Socket
+  (is (let [etype :czlab.wabbit.pugs.io.socket/Socket
             m (emitterByService etype)
             host "localhost"
             port 5555
             c (assoc (:conf m)
                      :host host
                      :port port
-                     :handler "czlab.test.wabbit.svcs/sockHandler")
+                     :handler "czlab.test.wabbit.pugs.svcs/sockHandler")
             ^Container
             ctr (mock :container)
             s (service<> ctr etype "t" c)]
@@ -292,11 +291,11 @@
         (== @result-var 32)))
 
 
-  (is (let [etype :czlab.wabbit.io.loops/OnceTimer
+  (is (let [etype :czlab.wabbit.pugs.io.loops/OnceTimer
             m (emitterByService etype)
             c (assoc (:conf m)
                      :delaySecs 1
-                     :handler "czlab.test.wabbit.svcs/testHandler")
+                     :handler "czlab.test.wabbit.pugs.svcs/testHandler")
             ^Container
             ctr (mock :container)
             s (service<> ctr etype "t" c)]
@@ -307,12 +306,12 @@
         (.dispose ctr)
         (== 8 @result-var)))
 
-  (is (let [etype :czlab.wabbit.io.loops/RepeatingTimer
+  (is (let [etype :czlab.wabbit.pugs.io.loops/RepeatingTimer
             m (emitterByService etype)
             c (assoc (:conf m)
                      :delaySecs 1
                      :intervalSecs 1
-                     :handler "czlab.test.wabbit.svcs/testHandler")
+                     :handler "czlab.test.wabbit.pugs.svcs/testHandler")
             ^Container
             ctr (mock :container)
             s (service<> ctr etype "t" c)]
@@ -323,7 +322,7 @@
         (.dispose ctr)
         (> @result-var 8)))
 
-  (is (let [etype :czlab.wabbit.io.files/FilePicker
+  (is (let [etype :czlab.wabbit.pugs.io.files/FilePicker
             m (emitterByService etype)
             root *tempfile-repo*
             from (str root "/from")
@@ -335,7 +334,7 @@
                      :fmask ""
                      :intervalSecs 1
                      :delaySecs 0
-                     :handler "czlab.test.wabbit.svcs/fileHandler")
+                     :handler "czlab.test.wabbit.pugs.svcs/fileHandler")
             ^Container
             ctr (mock :container)
             s (service<> ctr etype "t" c)]
@@ -360,6 +359,7 @@
 
   (is (string? "That's all folks!")))
 
-;;(clojure.test/run-tests 'czlab.test.wabbit.svcs)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;EOF
 
 

@@ -9,21 +9,21 @@
 (ns ^{:doc "Implementation for TCP socket service."
       :author "Kenneth Leung"}
 
-  czlab.wabbit.io.socket
+  czlab.wabbit.pugs.io.socket
 
-  (:require [czlab.xlib.process :refer [async!]]
-            [czlab.xlib.meta :refer [getCldr]]
-            [czlab.xlib.io :refer [closeQ]]
-            [czlab.xlib.logging :as log])
+  (:require [czlab.basal.process :refer [async!]]
+            [czlab.basal.meta :refer [getCldr]]
+            [czlab.basal.io :refer [closeQ]]
+            [czlab.basal.logging :as log])
 
-  (:use [czlab.wabbit.io.core]
-        [czlab.xlib.core]
-        [czlab.xlib.str]
+  (:use [czlab.wabbit.pugs.io.core]
+        [czlab.basal.core]
+        [czlab.basal.str]
         [czlab.wabbit.base.core])
 
   (:import [java.net InetAddress ServerSocket Socket]
-           [czlab.wabbit.pugs Pluggable]
-           [czlab.wabbit.io IoService SocketEvent]))
+           [czlab.wabbit.ctl Puglet Pluggable]
+           [czlab.wabbit.pugs.io SocketEvent]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;(set! *warn-on-reflection* true)

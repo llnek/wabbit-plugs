@@ -9,12 +9,12 @@
 (ns ^{:doc ""
       :author "Kenneth Leung"}
 
-  czlab.wabbit.auth.model
+  czlab.wabbit.pugs.auth.model
 
-  (:require [czlab.xlib.resources :refer [rstr]]
-            [czlab.xlib.io :refer [spitUtf8]]
-            [czlab.xlib.str :refer [toKW]]
-            [czlab.xlib.logging :as log])
+  (:require [czlab.basal.resources :refer [rstr]]
+            [czlab.basal.io :refer [spitUtf8]]
+            [czlab.basal.str :refer [toKW]]
+            [czlab.basal.logging :as log])
 
   (:use [czlab.horde.dbddl.postgresql]
         [czlab.horde.dbddl.sqlserver]
@@ -27,7 +27,7 @@
   (:import [czlab.horde JdbcInfo JdbcPool Schema]
            [java.sql Connection]
            [java.io File]
-           [czlab.xlib I18N]))
+           [czlab.jasal I18N]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;(set! *warn-on-reflection* true)

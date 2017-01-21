@@ -9,21 +9,22 @@
 (ns ^{:doc "Implementation for FilePicker."
       :author "Kenneth Leung"}
 
-  czlab.wabbit.io.files
+  czlab.wabbit.pugs.io.files
 
-  (:require [czlab.xlib.io :refer [mkdirs]]
-            [czlab.xlib.logging :as log]
+  (:require [czlab.basal.io :refer [mkdirs]]
+            [czlab.basal.logging :as log]
             [clojure.java.io :as io])
 
   (:use [czlab.wabbit.base.core]
-        [czlab.xlib.core]
-        [czlab.xlib.str]
-        [czlab.wabbit.io.loops]
-        [czlab.wabbit.io.core])
+        [czlab.basal.core]
+        [czlab.basal.str]
+        [czlab.wabbit.pugs.io.loops]
+        [czlab.wabbit.pugs.io.core])
 
   (:import [java.io FileFilter File IOException]
            [java.util Properties ResourceBundle]
-           [czlab.wabbit.io IoService FileEvent]
+           [czlab.wabbit.ctl Puglet Pluggable]
+           [czlab.wabbit.pugs.io FileEvent]
            [org.apache.commons.io.filefilter
             SuffixFileFilter
             PrefixFileFilter
@@ -34,8 +35,7 @@
             FileAlterationMonitor
             FileAlterationObserver
             FileAlterationListenerAdaptor]
-           [org.apache.commons.io FileUtils]
-           [czlab.wabbit.pugs Pluggable]))
+           [org.apache.commons.io FileUtils]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;(set! *warn-on-reflection* false)
@@ -44,7 +44,7 @@
 ;;
 (defn- evt<>
   ""
-  [^IoService co {:keys [fname fp]}]
+  [co {:keys [fname fp]}]
   (let
     [eeid (str "file#" (seqint2))
      f (io/file fp)]
