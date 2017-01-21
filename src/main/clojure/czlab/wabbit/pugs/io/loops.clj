@@ -127,9 +127,20 @@
       (source [_] co)
       (isRepeating [_] repeat?))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+(def
+  ^:private
+  manyspecdef
+  {:info {:name "Repeating Timer"
+          :version "1.0.0"}
+   :conf {:intervalSecs 300
+          :delaySecs 0
+          :handler nil}})
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- xxxTimer<>
+(defn- xxxTimer<m>
   ""
   [co {:keys [conf] :as spec} repeat?]
   (let
@@ -142,6 +153,41 @@
                  (if-not repeat? (stop)))]
     (reify
       Pluggable
+      (spec [_] manyspecdef)
+      (config [_] (dissoc (.intern impl) tee))
+      (init [_ arg]
+        (.copyEx impl (merge conf arg)))
+      (start [_ arg]
+        (let [t (Timer. true)]
+          (.setv impl tee t)
+          (configTimer t wakeup (.intern impl) repeat?)))
+      (stop [_] stop))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+(def
+  ^:private
+  onespecdef
+  {:info {:name "One Shot Timer"
+          :version "1.0.0"}
+   :conf {:delaySecs 0 :handler nil}})
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+(defn- xxxTimer<1>
+  ""
+  [co {:keys [conf] :as spec} repeat?]
+  (let
+    [tee (keyword (juid))
+     impl (muble<>)
+     stop #(do (try! (some-> ^Timer
+                             (.getv impl tee) (.cancel)))
+               (.unsetv impl tee))
+     wakeup #(do (dispatch! (evt<> co repeat?))
+                 (if-not repeat? (stop)))]
+    (reify
+      Pluggable
+      (spec [_] onespecdef)
       (config [_] (dissoc (.intern impl) tee))
       (init [_ arg]
         (.copyEx impl (merge conf arg)))
@@ -157,7 +203,7 @@
   ""
   ^Pluggable
   [co spec]
-  (xxxTimer<> co spec true))
+  (xxxTimer<1> co spec true))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -165,7 +211,7 @@
   ""
   ^Pluggable
   [co spec]
-  (xxxTimer<> co spec false))
+  (xxxTimer<m> co spec false))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF

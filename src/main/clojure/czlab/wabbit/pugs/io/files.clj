@@ -141,6 +141,20 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
+(def
+  ^:private
+  specdef
+  {:info {:name "File Picker"
+          :version "1.0.0"}
+   :conf {:targetFolder "/home/dropbox"
+          :recvFolder "/home/joe"
+          :fmask ""
+          :intervalSecs 300
+          :delaySecs 0
+          :handler nil}})
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
 (defn FilePicker
   ""
   ^Pluggable
@@ -155,6 +169,7 @@
                 (.getv impl mee) (.start)))
      par (threadedTimer {:schedule schedule})]
     (reify Pluggable
+      (spec [_] specdef)
       (init [_ arg]
         (.copyEx impl (init conf arg)))
       (config [_] (.intern impl))

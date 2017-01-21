@@ -16,6 +16,7 @@
             [czlab.basal.format :refer [readEdn]]
             [czlab.twisty.codec :refer [passwd<>]]
             [czlab.basal.logging :as log]
+            [czlab.wabbit.pugs.mvc.ftl :as ftl]
             [clojure.java.io :as io]
             [clojure.string :as cs])
 
@@ -334,7 +335,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn cfgShutdownServer
+(defn hookShutdown
   ""
   [^Atom gist func arg]
   (let [ch (-> (discardHTTPD<> func)
@@ -364,6 +365,24 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
+(def
+  ^:private
+  httpspecdef
+  {:info {:name "HTTP Server"
+          :version "1.0.0"}
+   :conf {:maxInMemory (* 1024 1024 4)
+          :maxContentSize -1
+          :waitMillis 0
+          :sockTimeOut 0
+          :host ""
+          :port 9090
+          :serverKey ""
+          :passwd ""
+          :handler nil
+          :routes nil}})
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
 (defn- httpXXX<>
   ""
   [co {:keys [conf] :as spec}]
@@ -373,9 +392,90 @@
      cee (keyword (juid))
      impl (muble<>)]
     (reify Pluggable
+      (spec [_] httpspecdef)
       (init [_ arg]
         (.copyEx impl
                  (httpBasicConfig pkey conf arg)))
+      (start [_ _]
+        (let [[bs ch] (boot<> co)]
+          (.setv impl bee bs)
+          (.setv impl cee ch)))
+      (stop [_]
+        (when-some [c (.getv impl cee)]
+          (stopServer c)
+          (.unsetv impl bee)
+          (.unsetv impl cee)))
+      (config [_] (.intern impl)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+(defn loadTemplate
+  ""
+  ^APersistentMap
+  [cfg tpath data]
+  (let
+    [ts (str "/" (triml tpath "/"))
+     out (ftl/renderFtl cfg ts data)]
+    {:data (xdata<> out)
+     :ctype
+     (cond
+       (.endsWith ts ".json") "application/json"
+       (.endsWith ts ".xml") "application/xml"
+       (.endsWith ts ".html") "text/html"
+       :else "text/plain")}))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+(def
+  ^:private
+  mvcspecdef
+  {:info {:name "Web Site"
+          :version "1.0.0"}
+   :conf {:maxInMemory (* 1024 1024 4)
+          :maxContentSize -1
+          :waitMillis 0
+          :sockTimeOut 0
+          :host ""
+          :port 9090
+          :serverKey ""
+          :passwd ""
+          :sessionAgeSecs 2592000
+          :maxIdleSecs 0
+          :hidden true
+          :domain ""
+          :domainPath "/"
+          :maxAgeSecs 3600
+          :useETags? false
+          :errorHandler nil
+          :handler nil
+          :routes
+          [{:mount "${pod.dir}/public/media/main/{}"
+            :uri "/(favicon\\..+)"}
+           {:mount "${pod.dir}/public/{}"
+            :uri "/public/(.*)"}
+           {:handler ""
+            :uri "/?"
+            :verbs #{:get}
+            :template  "/main/index.html"}]}})
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+(defn- httpMVC<>
+  ""
+  [co {:keys [conf] :as spec}]
+  (let
+    [pkey (.podKey (.server ^Puglet co))
+     bee (keyword (juid))
+     cee (keyword (juid))
+     impl (muble<>)]
+    (reify Pluggable
+      (spec [_] mvcspecdef)
+      (init [_ arg]
+        (.copyEx impl
+                 (httpBasicConfig pkey conf arg))
+        (.setv impl
+               :ftlCfg
+               (genFtlConfig {:root arg})))
       (start [_ _]
         (let [[bs ch] (boot<> co)]
           (.setv impl bee bs)
@@ -393,7 +493,7 @@
   ""
   ^Pluggable
   [co spec]
-  (httpXXX<> co spec))
+  (httpMVC<> co spec))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -402,7 +502,6 @@
   ^Pluggable
   [co spec]
   (httpXXX<> co spec))
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF

@@ -73,6 +73,17 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
+(def
+  ^:private
+  specdef
+  {:info {:name "TCP Socket Server"
+          :version "1.0.0"}
+   :conf {:host ""
+          :port 7551
+          :handler nil}})
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
 (defn SocketIO
   ""
   ^Pluggable
@@ -82,6 +93,7 @@
      impl (muble<>)]
     (reify
       Pluggable
+      (spec [_] specdef)
       (init [_ arg]
         (.copyEx impl (merge conf arg)))
       (config [_] (.intern impl))

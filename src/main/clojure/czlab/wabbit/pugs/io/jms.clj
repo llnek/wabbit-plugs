@@ -213,6 +213,23 @@
       (.start c)
       c)))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+(def
+  ^:private
+  specdef
+  {:info {:name "JMS Client"
+          :version "1.0.0"}
+   :conf {:contextFactory "czlab.proto.mock.jms.MockContextFactory"
+          :providerUrl "java://aaa"
+          :connFactory "tcf"
+          :destination "topic.abc"
+          :jndiUser "root"
+          :jndiPwd "root"
+          :jmsUser "anonymous"
+          :jmsPwd "anonymous"
+          :handler nil}})
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn JMS
@@ -225,6 +242,7 @@
      impl (muble<>)]
     (reify
       Pluggable
+      (spec [_] specdef)
       (init [_ arg]
         (.copyEx impl
                  (merge conf

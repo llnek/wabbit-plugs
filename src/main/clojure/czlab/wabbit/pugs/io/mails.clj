@@ -220,6 +220,23 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
+(def
+  ^:private
+  popspecdef
+  {:info {:name "POP3 Client"
+          :version "1.0.0"}
+   :conf {:host "pop.gmail.com"
+          :port 995
+          :deleteMsg? false
+          :username "joe"
+          :passwd "secret"
+          :intervalSecs 300
+          :delaySecs 0
+          :ssl? true
+          :handler nil}})
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
 (defn POP3
   ""
   ^Pluggable
@@ -229,6 +246,7 @@
      pkey (.podKey (.server ^IoService co))
      impl (muble<>)]
     (reify Pluggable
+      (spec [_] popspecdef)
       (config [_] (.intern impl))
       (start [_ _] ((:start funcs) (.intern impl)))
       (stop [_] ((:stop funcs)))
@@ -262,6 +280,23 @@
     (finally
       (closeStore co))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+(def
+  ^:private
+  imapspecdef
+  {:info {:name "IMAP Client"
+          :version "1.0.0"}
+   :conf {:host "imap.gmail.com"
+          :port 993
+          :deleteMsg? false
+          :ssl? true
+          :username "joe"
+          :passwd "secret"
+          :intervalSecs 300
+          :delaySecs 0
+          :handler nil}})
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn IMAP
@@ -273,6 +308,7 @@
      pkey (.podKey (.server ^IoService co))
      impl (muble<>)]
     (reify Pluggable
+      (spec [_] imapspecdef)
       (config [_] (.intern impl))
       (start [_ _] ((:start funcs) (.intern impl)))
       (stop [_] ((:stop funcs)))
