@@ -11,19 +11,25 @@
 package czlab.wabbit.pugs.io;
 
 import czlab.wabbit.ctl.PugEvent;
-import java.io.InputStream;
-import java.io.OutputStream;
+import czlab.jasal.XData;
 
 /**
  * @author Kenneth Leung
  */
-public interface SocketEvent extends PugEvent {
+public interface WSockMsg extends PugEvent {
 
   /**/
-  public OutputStream sockOut();
+  public boolean isBinary();
 
   /**/
-  public InputStream sockIn();
+  public boolean isText();
+
+  /**/
+  public boolean isSSL();
+
+  /**
+   */
+  public XData body();
 
 }
 

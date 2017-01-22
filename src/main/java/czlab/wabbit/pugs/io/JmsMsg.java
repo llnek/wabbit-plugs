@@ -16,7 +16,7 @@ import javax.jms.Message;
 /**
  * @author Kenneth Leung
  */
-public interface JmsEvent extends PugEvent {
+public interface JmsMsg extends PugEvent {
 
   /**
    */

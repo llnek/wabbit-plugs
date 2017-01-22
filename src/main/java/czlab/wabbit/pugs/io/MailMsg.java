@@ -16,7 +16,7 @@ import czlab.wabbit.ctl.PugEvent;
 /**
  * @author Kenneth Leung
  */
-public interface EmailEvent extends PugEvent {
+public interface MailMsg extends PugEvent {
 
   /**
    */

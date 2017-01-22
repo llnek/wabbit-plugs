@@ -10,16 +10,22 @@
 
 package czlab.wabbit.pugs.io;
 
-import czlab.convoy.net.HttpInvoke;
 import czlab.wabbit.ctl.PugEvent;
-import czlab.jasal.Triggerable;
+import java.io.InputStream;
+import java.io.OutputStream;
 
 /**
  * @author Kenneth Leung
  */
-public interface HttpEvent extends PugEvent, Triggerable, HttpInvoke {
+public interface SocketMsg extends PugEvent {
 
+  /**/
+  public OutputStream sockOut();
+
+  /**/
+  public InputStream sockIn();
 
 }
+
 
 

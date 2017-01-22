@@ -45,7 +45,7 @@
            [czlab.wabbit.base ConfigError]
            [clojure.lang APersistentMap]
            [java.io File IOException]
-           [czlab.wabbit.pugs.io HttpEvent]
+           [czlab.wabbit.pugs.io HttpMsg]
            [org.apache.shiro.authz
             AuthorizationException
             AuthorizationInfo]
@@ -104,7 +104,7 @@
 ;;
 (defn- crackFormFields
   "Parse a standard login-like form with userid,password,email"
-  [^HttpEvent evt]
+  [^HttpMsg evt]
   (if-some
     [itms (cast? ULFormItems
                  (some-> evt
@@ -122,7 +122,7 @@
 ;;
 (defn- crackBodyContent
   "Parse a JSON body"
-  [^HttpEvent evt]
+  [^HttpMsg evt]
   (let
     [xs (some-> evt (.body) (.getBytes))
      json (-> (if (some? xs)
@@ -139,7 +139,7 @@
 ;;
 (defn- crackParams
   "Parse form fields in the Url"
-  [^HttpEvent evt]
+  [^HttpMsg evt]
   (let [gist (.msgGist evt)]
     (preduce<map>
       #(let [[k [a1 a2]] props-map]
@@ -155,7 +155,7 @@
 (defn maybeGetAuthInfo
   "Attempt to parse and get authentication info"
   ^APersistentMap
-  [^HttpEvent evt]
+  [^HttpMsg evt]
   (let [gist (.msgGist evt)]
     (if-some+
       [ct (gistHeader gist "content-type")]
@@ -194,7 +194,7 @@
 (defn- getPodKey
   ""
   ^bytes
-  [^HttpEvent evt]
+  [^HttpMsg evt]
   (.. evt source server podKeyBits))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -208,11 +208,11 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn getSignupInfo "" [^HttpEvent evt] (getXXXInfo evt))
+(defn getSignupInfo "" [^HttpMsg evt] (getXXXInfo evt))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn getLoginInfo "" [^HttpEvent evt] (getXXXInfo evt))
+(defn getLoginInfo "" [^HttpMsg evt] (getXXXInfo evt))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -459,7 +459,7 @@
   (reify BoolExpr
     (ptest [_ job]
       (let
-        [^HttpEvent evt (.event job)
+        [^HttpMsg evt (.origin job)
          csrf (.. evt session xref)
          info (try
                 (getSignupInfo evt)
@@ -467,7 +467,7 @@
          info (or info {})
          rb (I18N/base)
          ^AuthPlugin
-         pa (-> ^Muble (.server job)
+         pa (-> ^Muble (.. evt source server getx)
                 (.getv :plugins)
                 (:auth ))]
         (log/debug "session csrf = %s%s%s"
@@ -520,7 +520,7 @@
   (reify BoolExpr
     (ptest [_ job]
       (let
-        [^HttpEvent evt (.event job)
+        [^HttpMsg evt (.origin job)
          csrf (.. evt session xref)
          info (try
                 (getSignupInfo evt)
@@ -529,7 +529,7 @@
          rb (I18N/base)
          ^AuthPlugin
          pa (-> ^Muble
-                (.server job)
+                (.. evt source server getx)
                 (.getv :plugins)
                 (:auth ))]
         (log/debug "session csrf = %s%s%s"

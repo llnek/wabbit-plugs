@@ -11,20 +11,14 @@
 package czlab.wabbit.pugs.io;
 
 import czlab.wabbit.ctl.PugEvent;
-import java.io.File;
 
 /**
  * @author Kenneth Leung
  */
-public interface FileEvent extends PugEvent {
+public interface TimerMsg extends PugEvent {
 
-  /**
-   */
-  public String originalFileName();
-
-  /**
-   */
-  public File file();
+  /**/
+  public boolean isRepeating();
 
 }
 

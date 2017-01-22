@@ -83,7 +83,7 @@
             InetAddress
             SocketAddress
             InetSocketAddress]
-           [czlab.wabbit.pugs.io HttpEvent WSockEvent]
+           [czlab.wabbit.pugs.io HttpMsg WSockMsg]
            [io.netty.channel
             Channel
             ChannelHandler
@@ -108,7 +108,7 @@
 (defn scanBasicAuth
   "Scan and parse if exists basic authentication"
   ^APersistentMap
-  [^HttpEvent evt]
+  [^HttpMsg evt]
   (if-some+ [v (-> (.msgGist evt)
                    (gistHeader auth-token))]
     (parseBasicAuth v)))
@@ -145,7 +145,7 @@
 ;;
 (defn- maybeClose
   ""
-  [^HttpEvent evt ^ChannelFuture cf]
+  [^HttpMsg evt ^ChannelFuture cf]
   (closeCF cf (:isKeepAlive? (.msgGist evt))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -162,7 +162,7 @@
 ;;
 (defn- resumeOnExpiry
   ""
-  [^Channel ch ^HttpEvent evt]
+  [^Channel ch ^HttpMsg evt]
   (try
     (->> (httpResult<>
            (.socket evt)
@@ -191,7 +191,7 @@
          (xdata<>))
      eeid (seqint2)]
     (with-meta
-      (reify WSockEvent
+      (reify WSockMsg
         (isBinary [_] (instBytes? (.content _body)))
         (isText [_] (string? (.content _body)))
         (checkAuthenticity [_] false)
@@ -200,13 +200,13 @@
         (isSSL [_] ssl?)
         (body [_] _body)
         (source [_] co))
-      {:typeid ::WSockEvent})))
+      {:typeid ::WSockMsg})))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- httpEvent<>
   ""
-  ^HttpEvent
+  ^HttpMsg
   [^Puglet co ^Channel ch ssl? ^WholeRequest req]
   (let
     [^InetSocketAddress laddr (.localAddress ch)
@@ -220,7 +220,7 @@
      cookieJar (:cookies gist)
      impl (muble<> {:stale false})]
     (with-meta
-      (reify HttpEvent
+      (reify HttpMsg
 
         (checkAuthenticity [_] wantSecure?)
         (checkSession [_] wantSess?)
@@ -291,7 +291,7 @@
   [^ChannelHandlerContext ctx ^Puglet co ^WholeRequest req]
   (let [{:keys [waitMillis]}
         (.config co)
-        ^HttpEvent
+        ^HttpMsg
         evt (evt<> co {:msg req
                        :ch (.channel ctx)})]
     (if (spos? waitMillis)
@@ -325,7 +325,7 @@
       #(let [^Job job %2
              s (or (.getv job :statusCode)
                    500)
-             ^HttpEvent evt (.event job)]
+             ^HttpMsg evt (.origin job)]
          (->> (httpResult<>
                 (.socket evt)
                 (.msgGist evt)

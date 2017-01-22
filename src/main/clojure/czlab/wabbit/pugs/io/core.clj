@@ -38,7 +38,7 @@
   (workStream<>
     (script<>
       #(let [^Job job %2
-             evt (.event job)]
+             evt (.origin job)]
          (do->nil
            (log/error "event '%s' {job:#s} dropped"
                       (:typeid (meta evt)) (.id job)))))))

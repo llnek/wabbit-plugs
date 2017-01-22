@@ -23,7 +23,7 @@
 
   (:import [java.net InetAddress ServerSocket Socket]
            [czlab.wabbit.ctl Puglet Pluggable]
-           [czlab.wabbit.pugs.io SocketEvent]))
+           [czlab.wabbit.pugs.io SocketMsg]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;(set! *warn-on-reflection* true)
@@ -36,14 +36,14 @@
 
   (let [eeid (str "event#" (seqint2))]
     (with-meta
-      (reify SocketEvent
+      (reify SocketMsg
         (checkAuthenticity [_] false)
         (id [_] eeid)
         (sockOut [_] (.getOutputStream socket))
         (sockIn [_] (.getInputStream socket))
         (source [_] co)
         (dispose [_] (closeQ socket)))
-      {:typeid ::SocketEvent})))
+      {:typeid ::SocketMsg})))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

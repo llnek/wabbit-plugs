@@ -42,7 +42,7 @@
             TopicSubscriber]
            [java.io IOException]
            [javax.naming Context InitialContext]
-           [czlab.wabbit.pugs.io JmsEvent]))
+           [czlab.wabbit.pugs.io JmsMsg]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;(set! *warn-on-reflection* true)
@@ -55,12 +55,12 @@
   (let [eeid (str "event#" (seqint2))
         impl (muble<>)]
     (with-meta
-      (reify JmsEvent
+      (reify JmsMsg
         (checkAuthenticity [_] false)
         (id [_] eeid)
         (source [_] co)
         (message [_] msg))
-      {:typeid ::JmsEvent})))
+      {:typeid ::JmsMsg})))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

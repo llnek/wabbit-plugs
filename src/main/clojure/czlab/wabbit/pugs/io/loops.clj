@@ -21,7 +21,7 @@
         [czlab.basal.str]
         [czlab.wabbit.pugs.io.core])
 
-  (:import [czlab.wabbit.pugs.io TimerEvent]
+  (:import [czlab.wabbit.pugs.io TimerMsg]
            [java.util Date Timer TimerTask]
            [clojure.lang APersistentMap]
            [czlab.wabbit.ctl Puglet Pluggable]))
@@ -116,16 +116,18 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- evt<>
-  ^TimerEvent
+  ^TimerMsg
   [co repeat?]
   (let [eeid (str "event#"
                   (seqint2))]
-    (reify
-      TimerEvent
-      (checkAuthenticity [_] false)
-      (id [_] eeid)
-      (source [_] co)
-      (isRepeating [_] repeat?))))
+    (with-meta
+      (reify
+        TimerMsg
+        (checkAuthenticity [_] false)
+        (id [_] eeid)
+        (source [_] co)
+        (isRepeating [_] repeat?))
+      {:typeid ::TimerMsg})))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

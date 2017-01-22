@@ -15,16 +15,16 @@
             [czlab.basal.logging :as log]
             [clojure.java.io :as io])
 
-  (:use [czlab.wabbit.base.core]
+  (:use [czlab.wabbit.pugs.io.loops]
+        [czlab.wabbit.pugs.io.core]
+        [czlab.wabbit.base.core]
         [czlab.basal.core]
-        [czlab.basal.str]
-        [czlab.wabbit.pugs.io.loops]
-        [czlab.wabbit.pugs.io.core])
+        [czlab.basal.str])
 
   (:import [java.io FileFilter File IOException]
            [java.util Properties ResourceBundle]
            [czlab.wabbit.ctl Puglet Pluggable]
-           [czlab.wabbit.pugs.io FileEvent]
+           [czlab.wabbit.pugs.io FileMsg]
            [org.apache.commons.io.filefilter
             SuffixFileFilter
             PrefixFileFilter
@@ -49,13 +49,13 @@
     [eeid (str "file#" (seqint2))
      f (io/file fp)]
     (with-meta
-      (reify FileEvent
+      (reify FileMsg
         (checkAuthenticity [_] false)
         (originalFileName [_] fname)
         (source [_] co)
         (file [_] f)
         (id [_] eeid))
-      {:typeid ::FileEvent})))
+      {:typeid ::FileMsg})))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

@@ -11,27 +11,21 @@
 package czlab.wabbit.pugs.io;
 
 import czlab.wabbit.ctl.PugEvent;
-import czlab.jasal.XData;
+import java.io.File;
 
 /**
  * @author Kenneth Leung
  */
-public interface WSockEvent extends PugEvent {
-
-  /**/
-  public boolean isBinary();
-
-  /**/
-  public boolean isText();
-
-  /**/
-  public boolean isSSL();
+public interface FileMsg extends PugEvent {
 
   /**
    */
-  public XData body();
+  public String originalFileName();
+
+  /**
+   */
+  public File file();
 
 }
-
 
 

@@ -20,7 +20,7 @@
         [czlab.basal.str]
         [czlab.wabbit.pugs.io.core])
 
-  (:import [czlab.wabbit.pugs.io EmailEvent]
+  (:import [czlab.wabbit.pugs.io MailMsg]
            [javax.mail.internet MimeMessage]
            [javax.mail
             Flags$Flag
@@ -120,12 +120,12 @@
   [^Puglet co {:keys [msg]}]
   (let [eeid (str "event#" (seqint2))]
     (with-meta
-      (reify EmailEvent
+      (reify MailMsg
         (checkAuthenticity [_] false)
         (id [_] eeid)
         (source [_] co)
         (message [_] msg))
-      {:typeid ::EmailEvent })))
+      {:typeid ::MailMsg })))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

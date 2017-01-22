@@ -29,7 +29,7 @@
   (:import [czlab.jasal CU XData Muble Hierarchial Identifiable]
            [czlab.wabbit.pugs.auth ExpiredError AuthError]
            [czlab.wabbit.ctl Puglet PugEvent]
-           [czlab.wabbit.pugs.io HttpEvent]
+           [czlab.wabbit.pugs.io HttpMsg]
            [czlab.flux.wflow WorkStream Job]
            [java.net HttpCookie]
            [czlab.convoy.net
@@ -155,7 +155,7 @@
 ;;
 (defn downstream
   ""
-  [^HttpEvent evt ^HttpResult res]
+  [^HttpMsg evt ^HttpResult res]
   (let
     [{:keys [sessionAgeSecs
              domainPath
@@ -285,7 +285,7 @@
 (defn- getStatic
 
   ""
-  [^HttpEvent evt file]
+  [^HttpMsg evt file]
   (let [^Channel ch (.socket evt)
         res (httpResult<> ch (.msgGist evt))
         gist (.msgGist evt)
@@ -311,7 +311,7 @@
 ;;
 (defn- handleStatic
   "Handle static resource"
-  [^HttpEvent evt args]
+  [^HttpMsg evt args]
   (let
     [podDir (.. evt source server podDir)
      pubDir (io/file podDir dn-pub)
@@ -333,7 +333,7 @@
 ;;
 (defn serveError
   "Reply back an error"
-  [^HttpEvent evt status]
+  [^HttpMsg evt status]
   (try
     (let
       [rts (.. evt source server cljrt)
@@ -360,7 +360,7 @@
 (defn- serveStatic2
 
   "Reply back with a static file content"
-  [^HttpEvent evt]
+  [^HttpMsg evt]
 
   (let
     [podDir (.. evt source server podDir)
@@ -388,7 +388,7 @@
 ;;
 (defn serveStatic
   "Reply back with a static file content"
-  [^HttpEvent evt]
+  [^HttpMsg evt]
   (let
     [exp
      (try
@@ -405,7 +405,7 @@
 ;;
 (defn- serveRoute2
   "Handle a matched route"
-  [^HttpEvent evt]
+  [^HttpMsg evt]
   (let
     [gist (.msgGist evt)
      r (:route gist)
@@ -424,7 +424,7 @@
 ;;
 (defn serveRoute
   "Handle a matched route"
-  [^HttpEvent evt]
+  [^HttpMsg evt]
   (let
     [exp
      (try
@@ -442,7 +442,7 @@
 (def ^:private asset-handler
   (workStream<>
     (script<>
-      #(let [evt (.event ^Job %2)]
+      #(let [evt (.origin ^Job %2)]
          (handleStatic evt
                        (.getv ^Job %2 evt-opts))))))
 
@@ -454,7 +454,7 @@
 ;;
 (defn replyEvent
   ""
-  [^HttpEvent evt ^HttpResult res]
+  [^HttpMsg evt ^HttpResult res]
   (let [mvs (.session evt)
         code (.status res)]
     (.cancel evt)

@@ -10,15 +10,15 @@
 
 package czlab.wabbit.pugs.io;
 
+import czlab.convoy.net.HttpInvoke;
 import czlab.wabbit.ctl.PugEvent;
+import czlab.jasal.Triggerable;
 
 /**
  * @author Kenneth Leung
  */
-public interface TimerEvent extends PugEvent {
+public interface HttpMsg extends PugEvent, Triggerable, HttpInvoke {
 
-  /**/
-  public boolean isRepeating();
 
 }
 
