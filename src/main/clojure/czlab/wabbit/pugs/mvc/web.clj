@@ -313,8 +313,8 @@
   "Handle static resource"
   [^HttpMsg evt args]
   (let
-    [podDir (.. evt source server podDir)
-     pubDir (io/file podDir dn-pub)
+    [homeDir (.. evt source server homeDir)
+     pubDir (io/file homeDir dn-pub)
      cfg (.. evt source config)
      check? (:fileAccessCheck? cfg)
      fpath (str (:path args))
@@ -363,8 +363,8 @@
   [^HttpMsg evt]
 
   (let
-    [podDir (.. evt source server podDir)
-     pubDir (io/file podDir dn-pub)
+    [homeDir (.. evt source server homeDir)
+     pubDir (io/file homeDir dn-pub)
      gist (.msgGist evt)
      r (:route gist)
      ^RouteInfo ri (:info r)
@@ -375,7 +375,7 @@
      mpt (reduce
            #(cs/replace-first %1 "{}" %2)
            (.replace (str mpt)
-                     "${pod.dir}" (fpath podDir))
+                     "${pod.dir}" (fpath homeDir))
            (:groups r))
      mDir (io/file mpt)]
     (if (spos? waitMillis)
@@ -394,7 +394,7 @@
      (try
        (do->nil
          (upstream (.msgGist evt)
-                   (.podKeyBits (.. evt source server))
+                   (.pkeyBytes (.. evt source server))
                    (:maxIdleSecs (.. evt source config))))
        (catch AuthError _ _))]
     (if (some? exp)
@@ -430,7 +430,7 @@
      (try
        (do->nil
          (upstream evt
-                   (.. evt source server podKeyBits)
+                   (.. evt source server pkeyBytes)
                    (:maxIdleSecs (.. evt source config))))
        (catch AuthError _ _))]
     (if (some? exp)

@@ -195,7 +195,7 @@
   ""
   ^bytes
   [^HttpMsg evt]
-  (.. evt source server podKeyBits))
+  (.. evt source server pkeyBytes))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -236,7 +236,7 @@
   ([ctr] (getSQLr ctr false))
   ([^Execvisor ctr tx?]
    {:pre [(some? ctr)]}
-   (let [db (-> (.acquireDbPool ctr)
+   (let [db (-> (.dftDbPool ctr)
                 (dbopen<+> *auth-meta-cache*))]
      (if (boolean tx?)
        (.compositeSQLr db)
@@ -439,8 +439,8 @@
 ;;
 (defn- initShiro
   ""
-  [^File podDir ^String podKey]
-  (let [f (io/file podDir "ext/shiro.ini")]
+  [^File homeDir ^String podKey]
+  (let [f (io/file homeDir "ext/shiro.ini")]
     (if-not (fileRead? f)
       (trap! ConfigError "Missing shiro ini file"))
     (-> (io/as-url f)
@@ -572,12 +572,12 @@
   (reify AuthPlugin
 
     (init [_ arg]
-      (applyDDL (.acquireDbPool ctr)))
+      (applyDDL (.dftDbPool ctr)))
 
     (start [_ _]
-      (assertPluginOK (.acquireDbPool ctr))
-      (initShiro (.podDir ctr)
-                 (.podKey ctr))
+      (assertPluginOK (.dftDbPool ctr))
+      (initShiro (.homeDir ctr)
+                 (.pkey ctr))
       (log/info "AuthPlugin started"))
 
     (stop [_]
@@ -589,7 +589,7 @@
     (checkAction [_ acctObj action] )
 
     (addAccount [_ arg]
-      (let [pkey (.podKey ctr)]
+      (let [pkey (.pkey ctr)]
         (createLoginAccount
           (getSQLr ctr)
           (:principal arg)
@@ -601,7 +601,7 @@
 
     (login [_ u p]
       (binding
-        [*jdbc-pool* (.acquireDbPool ctr)
+        [*jdbc-pool* (.dftDbPool ctr)
          *meta-cache* *auth-meta-cache*]
         (let
           [cur (SecurityUtils/getSubject)
@@ -618,12 +618,12 @@
             (.getPrincipal cur)))))
 
     (hasAccount [_ arg]
-      (let [pkey (.podKey ctr)]
+      (let [pkey (.pkey ctr)]
         (hasLoginAccount? (getSQLr ctr)
                           (:principal arg))))
 
     (account [_ arg]
-      (let [pkey (.podKey ctr)
+      (let [pkey (.pkey ctr)
             sql (getSQLr ctr)]
         (cond
           (hgl? (:principal arg))
@@ -667,10 +667,10 @@
 (defn- doMain
   ""
   [& args]
-  (let [podDir (io/file (first args))
+  (let [homeDir (io/file (first args))
         cmd (nth args 1)
         db (nth args 2)
-        pod (slurpXXXConf podDir cfg-pod-cf true)
+        pod (slurpXXXConf homeDir cfg-pod-cf true)
         pkey (-> (get-in pod [:info :digest])
                  str
                  (.toCharArray))

@@ -83,7 +83,7 @@
              ^String jmsUser]}
      (.config co)
      pwd (->> (.server co)
-              (.podKey )
+              (.pkey )
               (passwd<> jmsPwd))
      c (.lookup ctx destination)
      ^Connection
@@ -116,7 +116,7 @@
              ^String jmsPwd]}
      (.config co)
      pwd (->> (.server co)
-              (.podKey)
+              (.pkey)
               (passwd<> jmsPwd))
      conn (if (hgl? jmsUser)
             (.createTopicConnection
@@ -149,7 +149,7 @@
              ^String jmsPwd]}
      (.config co)
      pwd (->> (.server co)
-              (.podKey)
+              (.pkey)
               (passwd<> jmsPwd))
      conn (if (hgl? jmsUser)
             (.createQueueConnection
@@ -241,7 +241,7 @@
   ^Pluggable
   [co {:keys [conf] :as spec}]
   (let
-    [pkey (.podKey (.server ^Puglet co))
+    [pkey (.pkey (.server ^Puglet co))
      cee (keyword (juid))
      impl (muble<>)]
     (reify

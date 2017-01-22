@@ -387,7 +387,7 @@
   ""
   [co {:keys [conf] :as spec}]
   (let
-    [pkey (.podKey (.server ^Puglet co))
+    [pkey (.pkey (.server ^Puglet co))
      bee (keyword (juid))
      cee (keyword (juid))
      impl (muble<>)]
@@ -464,7 +464,7 @@
   ""
   [co {:keys [conf] :as spec}]
   (let
-    [pkey (.podKey (.server ^Puglet co))
+    [pkey (.pkey (.server ^Puglet co))
      bee (keyword (juid))
      cee (keyword (juid))
      impl (muble<>)]

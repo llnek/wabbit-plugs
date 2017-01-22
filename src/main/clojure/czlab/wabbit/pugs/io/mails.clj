@@ -246,7 +246,7 @@
   [co {:keys [conf] :as spec}]
   (let
     [funcs (threadedTimer {:wakeup wake<o>})
-     pkey (.podKey (.server ^Puglet co))
+     pkey (.pkey (.server ^Puglet co))
      impl (muble<>)]
     (reify Pluggable
       (spec [_] popspecdef)
@@ -312,7 +312,7 @@
   [co {:keys [conf] :as spec}]
   (let
     [funcs (threadedTimer {:wakeup wake<i>})
-     pkey (.podKey (.server ^Puglet co))
+     pkey (.pkey (.server ^Puglet co))
      impl (muble<>)]
     (reify Pluggable
       (spec [_] imapspecdef)
