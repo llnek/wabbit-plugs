@@ -25,7 +25,7 @@
            [java.lang.management ManagementFactory]
            [java.rmi.server UnicastRemoteObject]
            [java.rmi NoSuchObjectException]
-           [czlab.wabbit.sys Container]
+           [czlab.wabbit.sys Execvisor]
            [czlab.jasal Muble]
            [java.util HashMap]
            [javax.management.remote
@@ -125,7 +125,7 @@
 (defn- jmsPlugin<>
   ""
   ^JmxPlugin
-  [^Container ctr]
+  [^Execvisor ctr]
   (let
     [impl (muble<> {:registryPort 7777
                     :serverPort 7778

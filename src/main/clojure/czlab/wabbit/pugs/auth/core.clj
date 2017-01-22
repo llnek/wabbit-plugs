@@ -14,7 +14,7 @@
   (:require [czlab.basal.format :refer [readEdn readJsonStr writeJsonStr]]
             [czlab.twisty.codec :refer [caesarDecrypt passwd<>]]
             [czlab.convoy.net.util :refer [filterFormFields]]
-            [czlab.wabbit.io.http :refer [scanBasicAuth]]
+            [czlab.wabbit.pugs.io.http :refer [scanBasicAuth]]
             [czlab.horde.dbio.connect :refer [dbopen<+>]]
             [czlab.basal.resources :refer [rstr]]
             [clojure.string :as cs]
@@ -41,7 +41,7 @@
            [org.apache.shiro.subject Subject]
            [java.util Base64 Base64$Decoder]
            [org.apache.shiro SecurityUtils]
-           [czlab.wabbit.sys Container]
+           [czlab.wabbit.sys Execvisor]
            [czlab.wabbit.base ConfigError]
            [clojure.lang APersistentMap]
            [java.io File IOException]
@@ -234,7 +234,7 @@
   ""
   {:tag SQLr}
   ([ctr] (getSQLr ctr false))
-  ([^Container ctr tx?]
+  ([^Execvisor ctr tx?]
    {:pre [(some? ctr)]}
    (let [db (-> (.acquireDbPool ctr)
                 (dbopen<+> *auth-meta-cache*))]
@@ -567,7 +567,7 @@
 (defn- authPlugin<>
   ""
   ^AuthPlugin
-  [^Container ctr]
+  [^Execvisor ctr]
 
   (reify AuthPlugin
 

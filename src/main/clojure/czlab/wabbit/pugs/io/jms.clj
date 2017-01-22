@@ -42,7 +42,6 @@
             TopicSubscriber]
            [java.io IOException]
            [javax.naming Context InitialContext]
-           [czlab.wabbit.sys Container]
            [czlab.wabbit.pugs.io JmsEvent]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

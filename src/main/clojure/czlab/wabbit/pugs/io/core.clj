@@ -24,7 +24,7 @@
            [czlab.jasal Triggerable]
            [czlab.flux.wflow WorkStream Job TaskDef]
            [java.util Timer TimerTask]
-           [czlab.wabbit.sys Cljshim Container]))
+           [czlab.wabbit.sys Cljshim]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;(set! *warn-on-reflection* true)

@@ -19,19 +19,18 @@
 
   (:use [czlab.wabbit.base.core]
         [czlab.convoy.net.core]
-        [czlab.wabbit.io.http]
+        [czlab.wabbit.pugs.io.http]
         [czlab.basal.consts]
         [czlab.basal.core]
         [czlab.basal.str]
         [czlab.flux.wflow.core]
-        [czlab.wabbit.io.core])
+        [czlab.wabbit.pugs.io.core])
 
   (:import [czlab.jasal CU XData Muble Hierarchial Identifiable]
            [czlab.wabbit.pugs.auth ExpiredError AuthError]
            [czlab.wabbit.ctl Puglet PugEvent]
            [czlab.wabbit.pugs.io HttpEvent]
            [czlab.flux.wflow WorkStream Job]
-           [czlab.wabbit.sys Container]
            [java.net HttpCookie]
            [czlab.convoy.net
             WebContent

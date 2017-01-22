@@ -49,7 +49,7 @@
            [io.netty.buffer ByteBuf Unpooled]
            [io.netty.handler.ssl SslHandler]
            [czlab.flux.wflow Job]
-           [czlab.wabbit.sys Container]
+           [czlab.wabbit.sys Execvisor]
            [czlab.wabbit.ctl Pluggable Puglet PugEvent]
            [clojure.lang Atom APersistentMap]
            [czlab.twisty IPassword]
@@ -178,7 +178,7 @@
 ;;
 (defn- wsockEvent<>
   ""
-  [^IoService co ^Channel ch ssl? msg]
+  [^Puglet co ^Channel ch ssl? msg]
   (let
     [_body
      (-> (cond
@@ -207,7 +207,7 @@
 (defn- httpEvent<>
   ""
   ^HttpEvent
-  [^IoService co ^Channel ch ssl? ^WholeRequest req]
+  [^Puglet co ^Channel ch ssl? ^WholeRequest req]
   (let
     [^InetSocketAddress laddr (.localAddress ch)
      _body (.content req)
@@ -288,7 +288,7 @@
 ;;
 (defn- h1Handler->onRead
   ""
-  [^ChannelHandlerContext ctx ^IoService co ^WholeRequest req]
+  [^ChannelHandlerContext ctx ^Puglet co ^WholeRequest req]
   (let [{:keys [waitMillis]}
         (.config co)
         ^HttpEvent
@@ -304,7 +304,7 @@
   ""
   [co]
   (let
-    [cfg (.config ^IoService co)
+    [cfg (.config ^Puglet co)
      bs
      (httpServer<>
        (proxy [CPDecorator][]
@@ -387,7 +387,7 @@
   ""
   [co {:keys [conf] :as spec}]
   (let
-    [pkey (.podKey (.server ^IoService co))
+    [pkey (.podKey (.server ^Puglet co))
      bee (keyword (juid))
      cee (keyword (juid))
      impl (muble<>)]
@@ -475,7 +475,7 @@
                  (httpBasicConfig pkey conf arg))
         (.setv impl
                :ftlCfg
-               (genFtlConfig {:root arg})))
+               (ftl/genFtlConfig {:root arg})))
       (start [_ _]
         (let [[bs ch] (boot<> co)]
           (.setv impl bee bs)

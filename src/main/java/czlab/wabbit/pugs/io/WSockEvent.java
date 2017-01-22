@@ -11,7 +11,7 @@
 package czlab.wabbit.pugs.io;
 
 import czlab.wabbit.ctl.PugEvent;
-import czlab.xlib.XData;
+import czlab.jasal.XData;
 
 /**
  * @author Kenneth Leung

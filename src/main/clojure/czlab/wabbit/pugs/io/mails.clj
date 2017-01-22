@@ -30,7 +30,6 @@
             Session
             Provider
             Provider$Type]
-           [czlab.wabbit.sys Container]
            [java.util Properties]
            [java.io IOException]
            [czlab.wabbit.ctl Puglet Pluggable]))
@@ -243,7 +242,7 @@
   [co {:keys [conf] :as spec}]
   (let
     [funcs (threadedTimer {:wakeup wake<o>})
-     pkey (.podKey (.server ^IoService co))
+     pkey (.podKey (.server ^Puglet co))
      impl (muble<>)]
     (reify Pluggable
       (spec [_] popspecdef)
@@ -305,7 +304,7 @@
   [co {:keys [conf] :as spec}]
   (let
     [funcs (threadedTimer {:wakeup wake<i>})
-     pkey (.podKey (.server ^IoService co))
+     pkey (.podKey (.server ^Puglet co))
      impl (muble<>)]
     (reify Pluggable
       (spec [_] imapspecdef)
