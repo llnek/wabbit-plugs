@@ -23,6 +23,7 @@
 
   (:import [java.net InetAddress ServerSocket Socket]
            [czlab.wabbit.ctl Puglet Pluggable]
+           [clojure.lang APersistentMap]
            [czlab.wabbit.pugs.io SocketMsg]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -81,6 +82,10 @@
    :conf {:host ""
           :port 7551
           :handler nil}})
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+(defn SocketIOSpec "" ^APersistentMap [] specdef)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

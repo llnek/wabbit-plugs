@@ -41,6 +41,7 @@
             TopicSession
             TopicSubscriber]
            [java.io IOException]
+           [clojure.lang APersistentMap]
            [javax.naming Context InitialContext]
            [czlab.wabbit.pugs.io JmsMsg]))
 
@@ -228,6 +229,10 @@
           :jmsUser "anonymous"
           :jmsPwd "anonymous"
           :handler nil}})
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+(defn JMSSpec "" ^APersistentMap [] specdef)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

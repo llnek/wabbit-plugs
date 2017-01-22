@@ -199,6 +199,11 @@
           (configTimer t wakeup (.intern impl) repeat?)))
       (stop [_] stop))))
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+(defn RepeatingTimerSpec "" ^APersistentMap [] manyspecdef)
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn RepeatingTimer
@@ -206,6 +211,10 @@
   ^Pluggable
   [co spec]
   (xxxTimer<1> co spec true))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+(defn RepeatingTimerSpec "" ^APersistentMap [] onespecdef)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

@@ -20,8 +20,9 @@
         [czlab.basal.str]
         [czlab.wabbit.pugs.io.core])
 
-  (:import [czlab.wabbit.pugs.io MailMsg]
-           [javax.mail.internet MimeMessage]
+  (:import [javax.mail.internet MimeMessage]
+           [czlab.wabbit.pugs.io MailMsg]
+           [clojure.lang APersistentMap]
            [javax.mail
             Flags$Flag
             Flags
@@ -233,6 +234,9 @@
           :delaySecs 0
           :ssl? true
           :handler nil}})
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+(defn POP3Spec "" ^APersistentMap [] popspecdef)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -295,6 +299,10 @@
           :intervalSecs 300
           :delaySecs 0
           :handler nil}})
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+(defn IMAPSpec "" ^APersistentMap [] imapspecdef)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

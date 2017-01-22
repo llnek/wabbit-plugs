@@ -24,6 +24,7 @@
   (:import [java.io FileFilter File IOException]
            [java.util Properties ResourceBundle]
            [czlab.wabbit.ctl Puglet Pluggable]
+           [clojure.lang APersistentMap]
            [czlab.wabbit.pugs.io FileMsg]
            [org.apache.commons.io.filefilter
             SuffixFileFilter
@@ -152,6 +153,10 @@
           :intervalSecs 300
           :delaySecs 0
           :handler nil}})
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+(defn FilePickerSpec "" ^APersistentMap [] specdef)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
