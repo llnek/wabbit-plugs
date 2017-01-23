@@ -13,12 +13,11 @@
    ;;[com.github.spullara.mustache.java/compiler "0.9.4" ]
    ;;[com.google.code.findbugs/jsr305 "3.0.1"]
    [org.apache.shiro/shiro-core "1.3.2"]
+   [io.czlab/proto "1.0.0" :scope "test"]
    [io.czlab/wabbit "1.0.0"]]
 
   :plugins [[lein-codox "0.10.2"]
-            [lein-czlab "1.0.0"]
             [lein-pprint "1.1.2"]]
-  :hooks [leiningen.lein-czlab]
 
   :profiles {:provided {:dependencies
                         [[org.clojure/clojure "1.8.0" :scope "provided"]

@@ -92,31 +92,32 @@
 (defn SocketIO
   ""
   ^Pluggable
-  [co {:keys [conf] :as spec}]
-  (let
-    [see (keyword (juid))
-     impl (muble<>)]
-    (reify
-      Pluggable
-      (spec [_] specdef)
-      (init [_ arg]
-        (.copyEx impl (merge conf arg)))
-      (config [_] (.intern impl))
-      (start [_ _]
-        (when-some
-          [ss (ssoc<> (.intern impl))]
-          (.setv impl see ss)
-          (async!
-            #(while (not (.isClosed ss))
-               (try
-                 (sockItDown co (.accept ss))
-                 (catch Throwable _
-                   (.unsetv impl see) (closeQ ss))))
-            {:cl (getCldr)})))
-      (stop [_]
-        (when-some [s (.getv impl see)]
-          (.unsetv impl see)
-          (closeQ s))))))
+  ([co] (SocketIO co (SocketIOSpec)))
+  ([co {:keys [conf] :as spec}]
+   (let
+     [see (keyword (juid))
+      impl (muble<>)]
+     (reify
+       Pluggable
+       (spec [_] specdef)
+       (init [_ arg]
+         (.copyEx impl (merge conf arg)))
+       (config [_] (.intern impl))
+       (start [_ _]
+         (when-some
+           [ss (ssoc<> (.intern impl))]
+           (.setv impl see ss)
+           (async!
+             #(while (not (.isClosed ss))
+                (try
+                  (sockItDown co (.accept ss))
+                  (catch Throwable _
+                    (.unsetv impl see) (closeQ ss))))
+             {:cl (getCldr)})))
+       (stop [_]
+         (when-some [s (.getv impl see)]
+           (.unsetv impl see)
+           (closeQ s)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF

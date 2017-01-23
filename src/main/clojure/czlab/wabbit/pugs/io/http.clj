@@ -496,8 +496,8 @@
 (defn WebMVC
   ""
   ^Pluggable
-  [co spec]
-  (httpMVC<> co spec))
+  ([co] (WebMVC co (WebMVCSpec)))
+  ([co spec] (httpMVC<> co spec)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -508,8 +508,8 @@
 (defn HTTP
   ""
   ^Pluggable
-  [co spec]
-  (httpXXX<> co spec))
+  ([co] (HTTP co (HTTPSpec)))
+  ([co spec] (httpXXX<> co spec)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF

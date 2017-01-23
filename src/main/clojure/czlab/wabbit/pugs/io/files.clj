@@ -163,30 +163,31 @@
 (defn FilePicker
   ""
   ^Pluggable
-  [co {:keys [conf] :as spec}]
-  (let
-    [mee (keyword (juid))
-     impl (muble<>)
-     schedule
-     #(let [_ %]
-        (log/info "apache io monitor starting...")
-        (some-> ^FileAlterationMonitor
-                (.getv impl mee) (.start)))
-     par (threadedTimer {:schedule schedule})]
-    (reify Pluggable
-      (spec [_] specdef)
-      (init [_ arg]
-        (.copyEx impl (init conf arg)))
-      (config [_] (.intern impl))
-      (start [_ _]
-        (let [m (fileMon<> co (.intern impl))]
-          (.setv impl mee m)
-          ((:start par) (.intern impl))))
-      (stop [_]
-       (log/info "apache io monitor stopping...")
-       (some-> ^FileAlterationMonitor
-               (.getv impl mee) (.stop))
-       (.unsetv impl mee)))))
+  ([co] (FilePicker co (FilePickerSpec)))
+  ([co {:keys [conf] :as spec}]
+   (let
+     [mee (keyword (juid))
+      impl (muble<>)
+      schedule
+      #(let [_ %]
+         (log/info "apache io monitor starting...")
+         (some-> ^FileAlterationMonitor
+                 (.getv impl mee) (.start)))
+      par (threadedTimer {:schedule schedule})]
+     (reify Pluggable
+       (spec [_] specdef)
+       (init [_ arg]
+         (.copyEx impl (init conf arg)))
+       (config [_] (.intern impl))
+       (start [_ _]
+         (let [m (fileMon<> co (.intern impl))]
+           (.setv impl mee m)
+           ((:start par) (.intern impl))))
+       (stop [_]
+         (log/info "apache io monitor stopping...")
+         (some-> ^FileAlterationMonitor
+                 (.getv impl mee) (.stop))
+         (.unsetv impl mee))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF

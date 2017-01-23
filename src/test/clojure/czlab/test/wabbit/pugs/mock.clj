@@ -20,23 +20,10 @@
   (:use [czlab.wabbit.base.core]
         [czlab.basal.core]
         [czlab.basal.str]
-        [czlab.basal.io]
-        [czlab.wabbit.pugs.io.core]
-        [czlab.wabbit.pugs.io.loops]
-        [czlab.wabbit.pugs.io.mails]
-        [czlab.wabbit.pugs.io.files]
-        [czlab.wabbit.pugs.io.jms]
-        [czlab.wabbit.pugs.io.http]
-        [czlab.wabbit.pugs.io.socket])
+        [czlab.basal.io])
 
-  (:import [czlab.wabbit.base Gist]
-           [czlab.wabbit.sys
-            Execvisor
-            Cljshim
-            Container]
-           [czlab.jasal
-            Activable
-            Schedulable]
+  (:import [czlab.wabbit.sys Execvisor Cljshim]
+           [czlab.jasal Activable Schedulable]
            [czlab.wabbit.ctl PugEvent]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -44,121 +31,67 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- mkctr
-  ""
-  ^Container
-  [^Execvisor parObj ^Gist gist]
-  (let
-    [rts (Cljshim/newrt (getCldr) "mock")
-     ctx (.getx gist)
-     impl (muble<> {:services {}})]
-    (with-meta
-      (reify
-        Container
-        (podKeyBits [this] (bytesify (.podKey this)))
-        (podKey [_] "hello world")
-        (podDir [this] (getCwd))
-        (cljrt [_] rts)
-        (getx [_] impl)
-        (version [_] "1.0")
-        (id [_] "007")
-        (name [_] "mock")
-
-        (acquireDbPool [this gid] nil)
-        (acquireDbAPI [this gid] nil)
-        (acquireDbPool [this] nil)
-        (acquireDbAPI [this] nil)
-
-        (parent [_] parObj)
-        (setParent [_ x])
-
-        (loadTemplate [_ tpath ctx])
-        (isEnabled [_] true)
-
-        (service [_ sid])
-        (hasService [_ sid])
-
-        (core [_]
-          (.getv impl :core))
-
-        (podConfig [_] {})
-
-        (start [this _] )
-        (stop [this] )
-        (dispose [this]
-          (.dispose (.core this))
-          (.close rts)))
-
-      {:typeid ::Container})))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-(defn- init<c>
-  ""
-  ^Container
-  [^Container co ^Execvisor execv]
-  (let
-    [cpu (scheduler<> (.id co))
-     rts (.cljrt co)
-     pid (.id co)]
-    (.setv (.getx co) :core cpu)
-    (.activate ^Activable cpu {})
-    co))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
 (defn- mkexe
+  ""
   ^Execvisor
   []
   (let
-    [impl (muble<> {:container nil
-                    :pod nil
-                    :services {}})]
+    [rts (Cljshim/newrt (getCldr) "mock")
+     pid (juid)
+     cpu (scheduler<> pid)
+     impl (muble<> {:plugs {}})]
     (with-meta
       (reify
         Execvisor
-        (uptimeInMillis [_] 0)
-        (id [_] "001")
+
+        (pkeyBytes [this] (bytesify (.pkey this)))
+        (pkey [_] "hello world")
         (homeDir [_] (getCwd))
-        (locale [_] nil)
-        (version [_] "1.0")
+        (cljrt [_] rts)
+
         (getx [_] impl)
+        (version [_] "1.0")
+        (id [_] pid)
+
+        (uptimeInMillis [_] 0)
+        (locale [_] nil)
         (startTime [_] 0)
         (kill9 [_] )
         (start [this _] )
-        (stop [this] ))
+        (stop [this] )
+
+        (acquireDbPool [_ gid] nil)
+        (acquireDbAPI [_ gid] nil)
+        (dftDbPool [_] nil)
+        (dftDbAPI [_] nil)
+
+        (child [_ sid])
+        (hasChild [_ sid])
+
+        (core [_] cpu)
+        (config [_] {})
+
+        (dispose [this]
+          (.dispose cpu)
+          (.close rts)))
+
       {:typeid ::Execvisor})))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- mkgist
+(defn- init
   ""
-  ^Gist
-  [^Execvisor ec]
-  (let [impl (muble<>)]
-    (with-meta
-      (reify
-        Gist
-        (setParent [_ p] )
-        (parent [_] ec)
-        (version [_] "1.0")
-        (id [_] "005")
-        (getx [_] impl))
-      {:typeid  ::PodGist})))
+  [^Execvisor co]
+  (let []
+    (.activate ^Activable (.core co) nil) co))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn mock
+(defn mocker
   ""
-  [kind]
-  (case kind
-    :execvisor nil
-    :pod nil
-    :container
-    (let [e (mkexe)
-          p (mkgist e)
-          c (mkctr e p)]
-      (init<c> c e))))
+  ^Execvisor
+  [_]
+  (doto (mkexe) (init )))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF

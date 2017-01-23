@@ -209,20 +209,20 @@
 (defn RepeatingTimer
   ""
   ^Pluggable
-  [co spec]
-  (xxxTimer<1> co spec true))
+  ([co] (RepeatingTimer co (RepeatingTimerSpec)))
+  ([co spec] (xxxTimer<1> co spec true)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn RepeatingTimerSpec "" ^APersistentMap [] onespecdef)
+(defn OnceTimerSpec "" ^APersistentMap [] onespecdef)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn OnceTimer
   ""
   ^Pluggable
-  [co spec]
-  (xxxTimer<m> co spec false))
+  ([co] (OnceTimer co (OnceTimerSpec)))
+  ([co spec] (xxxTimer<m> co spec false)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF

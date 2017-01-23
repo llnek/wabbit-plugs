@@ -178,7 +178,7 @@
   ""
   [^Puglet co]
   (let [{:keys [^Folder folder ^Store store]}
-        (.config co)]
+        (.intern (.getx co))]
     (if (and (some? folder)
              (not (.isOpen folder)))
       (.open folder Folder/READ_WRITE))
@@ -243,24 +243,25 @@
 (defn POP3
   ""
   ^Pluggable
-  [co {:keys [conf] :as spec}]
-  (let
-    [funcs (threadedTimer {:wakeup wake<o>})
-     pkey (.pkey (.server ^Puglet co))
-     impl (muble<>)]
-    (reify Pluggable
-      (spec [_] popspecdef)
-      (config [_] (.intern impl))
-      (start [_ _] ((:start funcs) (.intern impl)))
-      (stop [_] ((:stop funcs)))
-      (init [_ arg]
-        (let [c2 (merge conf
-                        (sanitize pkey arg))
-              [z p] (if (:ssl? c2)
-                      [cz-pop3s pop3s]
-                      [cz-pop3 pop3c])]
-          (.copyEx impl c2)
-          (resolveProvider co z p))))))
+  ([co] (POP3 co (POP3Spec)))
+  ([co {:keys [conf] :as spec}]
+   (let
+     [funcs (threadedTimer {:wakeup #(wake<o> co) })
+      pkey (.pkey (.server ^Puglet co))
+      impl (muble<>)]
+     (reify Pluggable
+       (spec [_] popspecdef)
+       (config [_] (.intern impl))
+       (start [_ _] ((:start funcs) (.intern impl)))
+       (stop [_] ((:stop funcs)))
+       (init [_ arg]
+         (let [c2 (merge conf
+                         (sanitize pkey arg))
+               [z p] (if (:ssl? c2)
+                       [cz-pop3s pop3s]
+                       [cz-pop3 pop3c])]
+           (.copyEx impl c2)
+           (resolveProvider co z p)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -309,24 +310,25 @@
 (defn IMAP
   ""
   ^Pluggable
-  [co {:keys [conf] :as spec}]
-  (let
-    [funcs (threadedTimer {:wakeup wake<i>})
-     pkey (.pkey (.server ^Puglet co))
-     impl (muble<>)]
-    (reify Pluggable
-      (spec [_] imapspecdef)
-      (config [_] (.intern impl))
-      (start [_ _] ((:start funcs) (.intern impl)))
-      (stop [_] ((:stop funcs)))
-      (init [_ arg]
-        (let [c2 (merge conf
-                        (sanitize pkey arg))
-              [z p] (if (:ssl? c2)
-                      [cz-imaps imaps]
-                      [cz-imap imap])]
-          (.copyEx impl c2)
-          (resolveProvider co z p))))))
+  ([co] (IMAP co (IMAPSpec)))
+  ([co {:keys [conf] :as spec}]
+   (let
+     [funcs (threadedTimer {:wakeup #(wake<i> co) })
+      pkey (.pkey (.server ^Puglet co))
+      impl (muble<>)]
+     (reify Pluggable
+       (spec [_] imapspecdef)
+       (config [_] (.intern impl))
+       (start [_ _] ((:start funcs) (.intern impl)))
+       (stop [_] ((:stop funcs)))
+       (init [_ arg]
+         (let [c2 (merge conf
+                         (sanitize pkey arg))
+               [z p] (if (:ssl? c2)
+                       [cz-imaps imaps]
+                       [cz-imap imap])]
+           (.copyEx impl c2)
+           (resolveProvider co z p)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF

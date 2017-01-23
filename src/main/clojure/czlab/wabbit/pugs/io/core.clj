@@ -69,12 +69,12 @@
    (let
      [src (.source evt)
       cfg (.config src)
-      c1 (:router arg)
-      c0 (:handler cfg)
+      c0 (strKW (:handler cfg))
+      c1 (strKW (:router arg))
       ctr (.server src)
       rts (.cljrt ctr)
       cb (stror c1 c0)
-      job (job<> ctr nil evt)
+      job (job<> (.core ctr) nil evt)
       wf (try! (.call rts cb))]
      (log/debug (str "event type = %s\n"
                      "event opts = %s\n"

@@ -239,27 +239,28 @@
 (defn JMS
   ""
   ^Pluggable
-  [co {:keys [conf] :as spec}]
-  (let
-    [pkey (.pkey (.server ^Puglet co))
-     cee (keyword (juid))
-     impl (muble<>)]
-    (reify
-      Pluggable
-      (spec [_] specdef)
-      (init [_ arg]
-        (.copyEx impl
-                 (merge conf
-                        (sanitize pkey arg))))
-      (config [_] (.intern impl))
-      (start [_ _]
-        (when-some [c (start co (.intern impl))]
-          (.setv impl cee c)))
-      (stop [_]
-        (when-some
-          [^Connection c (.getv impl cee)]
-          (try! (.close c))
-          (.unsetv impl cee))))))
+  ([co] (JMS co (JMSSpec)))
+  ([co {:keys [conf] :as spec}]
+   (let
+     [pkey (.pkey (.server ^Puglet co))
+      cee (keyword (juid))
+      impl (muble<>)]
+     (reify
+       Pluggable
+       (spec [_] specdef)
+       (init [_ arg]
+         (.copyEx impl
+                  (merge conf
+                         (sanitize pkey arg))))
+       (config [_] (.intern impl))
+       (start [_ _]
+         (when-some [c (start co (.intern impl))]
+           (.setv impl cee c)))
+       (stop [_]
+         (when-some
+           [^Connection c (.getv impl cee)]
+           (try! (.close c))
+           (.unsetv impl cee)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF
