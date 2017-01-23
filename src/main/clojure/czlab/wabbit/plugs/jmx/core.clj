@@ -20,7 +20,7 @@
 
   (:import [java.net InetAddress MalformedURLException]
            [java.rmi.registry LocateRegistry Registry]
-           [czlab.wabbit.plugs.jmx JmxPlugin]
+           [czlab.wabbit.jmx JmxPluglet]
            [czlab.wabbit.ctl Pluggable]
            [java.lang.management ManagementFactory]
            [java.rmi.server UnicastRemoteObject]
@@ -122,17 +122,30 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- jmsPlugin<>
+(defn- jmsPluglet<>
   ""
-  ^JmxPlugin
+  ^JmxPluglet
   [^Execvisor ctr]
   (let
     [impl (muble<> {:registryPort 7777
                     :serverPort 7778
                     :host (-> (InetAddress/getLocalHost)
                               (.getHostName))})
+     pid (str "jmx#" (seqint2))
      objNames (atom [])]
-    (reify JmxPlugin
+    (reify JmxPluglet
+
+      (isEnabled [this]
+        (not (false? (:enabled? (.config this)))))
+
+      (config [_] (.intern impl))
+      (spec [_] nil)
+
+      (server [_] ctr)
+      (hold [_ _ _])
+      (version [_] "")
+      (id [_] pid)
+      (getx [_] impl)
 
       (reset [this]
         (let [bs (.getv impl :beanSvr)]
@@ -160,7 +173,7 @@
       (start [_ _]
         (startRMI impl)
         (startJMX impl)
-        (log/info "JmxPlugin started"))
+        (log/info "JmxPluglet started"))
 
       (stop [this]
         (let [^JMXConnectorServer c (.getv impl :conn)
@@ -172,10 +185,10 @@
             (some-> r
                     (UnicastRemoteObject/unexportObject  true)))
           (.unsetv impl :rmi)
-          (log/info "JmxPlugin stopped")))
+          (log/info "JmxPluglet stopped")))
 
       (dispose [_]
-        (log/info "JmxPlugin disposed")))))
+        (log/info "JmxPluglet disposed")))))
 
   ;; jconsole port
   ;;(setRegistryPort [_ p] (.setv impl :registryPort p))
@@ -183,7 +196,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn JmxMonitor "" ^Pluggable [ctr] (jmsPlugin<> ctr))
+(defn JmxMonitor "" ^JmxPluglet [ctr] (jmsPluglet<> ctr))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF

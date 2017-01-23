@@ -10,12 +10,12 @@
 
 package czlab.wabbit.plugs.auth;
 
-import czlab.wabbit.ctl.Pluggable;
+import czlab.wabbit.ctl.Pluglet;
 
 /**
  * @author Kenneth Leung
  */
-public interface AuthPlugin extends Pluggable {
+public interface AuthPluglet extends Pluglet {
 
   /**/
   public void checkAction(Object acctObj, Object action);

@@ -566,80 +566,93 @@
 ;;
 (defn- authPlugin<>
   ""
-  ^AuthPlugin
+  ^AuthPluglet
   [^Execvisor ctr]
 
-  (reify AuthPlugin
+  (let [impl (muble<>)]
+    (reify AuthPluglet
 
-    (init [_ arg]
-      (applyDDL (.dftDbPool ctr)))
+      (isEnabled [this]
+          (not (false? (:enabled? (.config this)))))
 
-    (start [_ _]
-      (assertPluginOK (.dftDbPool ctr))
-      (initShiro (.homeDir ctr)
-                 (.pkey ctr))
-      (log/info "AuthPlugin started"))
+      (config [_] (.intern impl))
+      (spec [_] nil)
 
-    (stop [_]
-      (log/info "AuthPlugin stopped"))
+      (server [_] ctr)
+      (hold [_ _ _])
+      (version [_] "")
+      (id [_] pid)
+      (getx [_] impl)
 
-    (dispose [_]
-      (log/info "AuthPlugin disposed"))
+      (init [_ arg]
+        (applyDDL (.dftDbPool ctr)))
 
-    (checkAction [_ acctObj action] )
+      (start [_ _]
+        (assertPluginOK (.dftDbPool ctr))
+        (initShiro (.homeDir ctr)
+                   (.pkey ctr))
+        (log/info "AuthPlugin started"))
 
-    (addAccount [_ arg]
-      (let [pkey (.pkey ctr)]
-        (createLoginAccount
-          (getSQLr ctr)
-          (:principal arg)
-          (-> (:credential arg)
-              (passwd<> pkey))
-          (dissoc arg
-                  :principal :credential)
-          [])))
+      (stop [_]
+        (log/info "AuthPlugin stopped"))
 
-    (login [_ u p]
-      (binding
-        [*jdbc-pool* (.dftDbPool ctr)
-         *meta-cache* *auth-meta-cache*]
-        (let
-          [cur (SecurityUtils/getSubject)
-           sss (.getSession cur)]
-          (log/debug "Current user session %s" sss)
-          (log/debug "Current user object %s" cur)
-          (when-not (.isAuthenticated cur)
-            (try!
-              ;;(.setRememberMe token true)
-              (.login cur
-                      (UsernamePasswordToken. ^String u ^String p))
-              (log/debug "User [%s] logged in successfully" u)))
-          (if (.isAuthenticated cur)
-            (.getPrincipal cur)))))
+      (dispose [_]
+        (log/info "AuthPlugin disposed"))
 
-    (hasAccount [_ arg]
-      (let [pkey (.pkey ctr)]
-        (hasLoginAccount? (getSQLr ctr)
-                          (:principal arg))))
+      (checkAction [_ acctObj action] )
 
-    (account [_ arg]
-      (let [pkey (.pkey ctr)
-            sql (getSQLr ctr)]
-        (cond
-          (hgl? (:principal arg))
-          (findLoginAccount sql
-                            (:principal arg))
-          (hgl? (:email arg))
-          (findLoginAccountViaEmail sql
-                                    (:email arg))
-          :else nil)))
+      (addAccount [_ arg]
+        (let [pkey (.pkey ctr)]
+          (createLoginAccount
+            (getSQLr ctr)
+            (:principal arg)
+            (-> (:credential arg)
+                (passwd<> pkey))
+            (dissoc arg
+                    :principal :credential)
+            [])))
 
-    ;;TODO: get roles please
-    (roles [_ acct] [])))
+      (login [_ u p]
+        (binding
+          [*jdbc-pool* (.dftDbPool ctr)
+           *meta-cache* *auth-meta-cache*]
+          (let
+            [cur (SecurityUtils/getSubject)
+             sss (.getSession cur)]
+            (log/debug "Current user session %s" sss)
+            (log/debug "Current user object %s" cur)
+            (when-not (.isAuthenticated cur)
+              (try!
+                ;;(.setRememberMe token true)
+                (.login cur
+                        (UsernamePasswordToken. ^String u ^String p))
+                (log/debug "User [%s] logged in successfully" u)))
+            (if (.isAuthenticated cur)
+              (.getPrincipal cur)))))
+
+      (hasAccount [_ arg]
+        (let [pkey (.pkey ctr)]
+          (hasLoginAccount? (getSQLr ctr)
+                            (:principal arg))))
+
+      (account [_ arg]
+        (let [pkey (.pkey ctr)
+              sql (getSQLr ctr)]
+          (cond
+            (hgl? (:principal arg))
+            (findLoginAccount sql
+                              (:principal arg))
+            (hgl? (:email arg))
+            (findLoginAccountViaEmail sql
+                                      (:email arg))
+            :else nil)))
+
+      ;;TODO: get roles please
+      (roles [_ acct] []))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn WebAuth "" ^Pluggable [ctr] (authPlugin<> ctr))
+(defn WebAuth "" ^AuthPluglet [ctr] (authPluglet<> ctr))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

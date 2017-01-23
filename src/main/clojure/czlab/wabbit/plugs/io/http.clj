@@ -429,7 +429,8 @@
 (def
   ^:private
   mvcspecdef
-  {:info {:name "Web Site"
+  {:deps [:czlab.wabbit.plugs.auth.core/WebAuth]
+   :info {:name "Web Site"
           :version "1.0.0"}
    :conf {:maxInMemory (* 1024 1024 4)
           :maxContentSize -1

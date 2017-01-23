@@ -19,7 +19,7 @@
 
   (:import [java.lang Exception IllegalArgumentException]
            [java.lang.reflect Field Method]
-           [czlab.wabbit.plugs.jmx NameParams]
+           [czlab.wabbit.jmx NameParams]
            [javax.management
             AttributeList
             Attribute

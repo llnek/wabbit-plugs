@@ -79,7 +79,8 @@
   specdef
   {:info {:name "TCP Socket Server"
           :version "1.0.0"}
-   :conf {:host ""
+   :conf {:pluggable ::SocketIO
+          :host ""
           :port 7551
           :handler nil}})
 
