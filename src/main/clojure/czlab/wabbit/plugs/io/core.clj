@@ -21,10 +21,9 @@
         [czlab.flux.wflow.core])
 
   (:import [czlab.wabbit.ctl Pluggable Pluglet PlugMsg]
-           [czlab.jasal Triggerable]
            [czlab.flux.wflow WorkStream Job TaskDef]
-           [java.util Timer TimerTask]
-           [czlab.wabbit.sys Cljshim]))
+           [czlab.jasal Triggerable]
+           [java.util Timer TimerTask]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;(set! *warn-on-reflection* true)

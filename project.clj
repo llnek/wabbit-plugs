@@ -12,8 +12,10 @@
   [[org.apache.geronimo.specs/geronimo-jms_1.1_spec "1.1.1"]
    ;;[com.github.spullara.mustache.java/compiler "0.9.4" ]
    ;;[com.google.code.findbugs/jsr305 "3.0.1"]
+   [org.freemarker/freemarker "2.3.25-incubating"]
    [org.apache.shiro/shiro-core "1.3.2"]
    [io.czlab/proto "1.0.0" :scope "test"]
+   [io.czlab/flux "1.0.0"]
    [io.czlab/wabbit "1.0.0"]]
 
   :plugins [[lein-codox "0.10.2"]

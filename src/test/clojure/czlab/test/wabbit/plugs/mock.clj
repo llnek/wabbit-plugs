@@ -22,8 +22,9 @@
         [czlab.basal.str]
         [czlab.basal.io])
 
-  (:import [czlab.wabbit.sys Execvisor Cljshim]
-           [czlab.jasal Activable Schedulable]
+  (:import [czlab.jasal Activable Schedulable]
+           [czlab.wabbit.sys Execvisor]
+           [czlab.wabbit.base Cljshim]
            [czlab.wabbit.ctl PlugMsg]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
