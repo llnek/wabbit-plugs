@@ -1,4 +1,4 @@
-# wabbit-pugs
+# wabbit-plugs
 Pluggables for wabbit
 
 ## Usage
