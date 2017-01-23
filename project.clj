@@ -1,12 +1,12 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defproject io.czlab/wabbit-pugs "1.0.0"
+(defproject io.czlab/wabbit-plugs "1.0.0"
 
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
 
   :description ""
-  :url "https://github.com/llnek/wabbit-pugs"
+  :url "https://github.com/llnek/wabbit-plugs"
 
   :dependencies
   [[org.apache.geronimo.specs/geronimo-jms_1.1_spec "1.1.1"]
@@ -31,7 +31,7 @@
   :aot :all
 
   ;;:jar-exclusions [#"(?:^|/).svn/"]
-  :coordinate! "czlab/wabbit/pugs"
+  :coordinate! "czlab/wabbit/plugs"
   :omit-source true
 
   :java-source-paths ["src/main/java" "src/test/java"]
