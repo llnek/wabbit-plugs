@@ -154,9 +154,8 @@
           nm))
 
       (init [_ arg]
-        (->> (or (:pug arg) {})
-             (.copyEx impl ))
-        true)
+        (->> (or arg {})
+             (.copyEx impl )))
 
       (start [_ _]
         (startRMI impl)
