@@ -76,13 +76,14 @@
 (defn- inizFac
   ""
   ^Connection
-  [^Pluglet co ^InitialContext ctx ^ConnectionFactory cf]
+  [^Pluggable co ^InitialContext ctx ^ConnectionFactory cf]
   (let
     [{:keys [^String destination
              ^String jmsPwd
              ^String jmsUser]}
      (.config co)
-     pwd (->> (.server co)
+     ^Pluglet pg (.parent co)
+     pwd (->> (.server pg)
               (.pkey )
               (passwd<> jmsPwd))
      c (.lookup ctx destination)
@@ -99,7 +100,7 @@
           (.createConsumer c)
           (.setMessageListener
             (reify MessageListener
-              (onMessage [_ m] (onMsg co m)))))
+              (onMessage [_ m] (onMsg pg m)))))
       (throwIOE "Object not of Destination type"))
     conn))
 
@@ -108,14 +109,15 @@
 (defn- inizTopic
   ""
   ^Connection
-  [^Pluglet co ^InitialContext ctx ^TopicConnectionFactory cf]
+  [^Pluggable co ^InitialContext ctx ^TopicConnectionFactory cf]
   (let
     [{:keys [^String destination
              ^String jmsUser
              durable?
              ^String jmsPwd]}
      (.config co)
-     pwd (->> (.server co)
+     ^Pluglet pg (.parent co)
+     pwd (->> (.server pg)
               (.pkey)
               (passwd<> jmsPwd))
      conn (if (hgl? jmsUser)
@@ -134,7 +136,7 @@
           (.createSubscriber s t))
         (.setMessageListener
           (reify MessageListener
-            (onMessage [_ m] (onMsg co m)))))
+            (onMessage [_ m] (onMsg pg m)))))
     conn))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -142,13 +144,14 @@
 (defn- inizQueue
   ""
   ^Connection
-  [^Pluglet co ^InitialContext ctx ^QueueConnectionFactory cf]
+  [^Pluggable co ^InitialContext ctx ^QueueConnectionFactory cf]
   (let
     [{:keys [^String destination
              ^String jmsUser
              ^String jmsPwd]}
      (.config co)
-     pwd (->> (.server co)
+     ^Pluglet pg (.parent co)
+     pwd (->> (.server pg)
               (.pkey)
               (passwd<> jmsPwd))
      conn (if (hgl? jmsUser)
@@ -165,7 +168,7 @@
     (-> (.createReceiver s ^Queue q)
         (.setMessageListener
           (reify MessageListener
-            (onMessage [_ m] (onMsg co m)))))
+            (onMessage [_ m] (onMsg pg m)))))
     conn))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -178,12 +181,12 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- start
+(defn- start2
   ""
   ^Connection
-  [co {:keys [contextFactory
-              providerUrl
-              jndiUser jndiPwd connFactory]}]
+  [^Pluggable co {:keys [contextFactory
+                         providerUrl
+                         jndiUser jndiPwd connFactory]}]
   (let
     [vars (Hashtable.)]
     (if (hgl? providerUrl)
@@ -220,7 +223,8 @@
   specdef
   {:info {:name "JMS Client"
           :version "1.0.0"}
-   :conf {:contextFactory "czlab.proto.mock.jms.MockContextFactory"
+   :conf {:$pluggable ::JMS
+          :contextFactory "czlab.proto.mock.jms.MockContextFactory"
           :providerUrl "java://aaa"
           :connFactory "tcf"
           :destination "topic.abc"
@@ -239,28 +243,30 @@
 (defn JMS
   ""
   ^Pluggable
-  ([co] (JMS co (JMSSpec)))
-  ([co {:keys [conf] :as spec}]
+  ([] (JMS (JMSSpec)))
+  ([{:keys [conf] :as pspec}]
    (let
-     [pkey (.pkey (.server ^Pluglet co))
-      cee (keyword (juid))
-      impl (muble<>)]
+     [impl (muble<>)]
      (reify
        Pluggable
-       (spec [_] specdef)
-       (init [_ arg]
-         (.copyEx impl
-                  (merge conf
-                         (sanitize pkey arg))))
-       (config [_] (.intern impl))
-       (start [_ _]
-         (when-some [c (start co (.intern impl))]
-           (.setv impl cee c)))
+       (setParent [_ p] (.setv impl :$parent p))
+       (parent [_] (.getv impl :$parent))
+       (config [_] (dissoc (.intern impl)
+                           :$parent :$conn))
+       (spec [_] pspec)
+       (init [this arg]
+         (let [^Pluglet pg (.parent this)
+               k (.. pg server pkey)]
+           (.copyEx impl
+                    (merge conf
+                         (sanitize k arg)))))
+       (start [this _]
+         (when-some [c (start2 this (.intern impl))]
+           (.setv impl :$conn c)))
        (stop [_]
          (when-some
-           [^Connection c (.getv impl cee)]
-           (try! (.close c))
-           (.unsetv impl cee)))))))
+           [^Connection c (.unsetv impl :$conn)]
+           (try! (.close c))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF

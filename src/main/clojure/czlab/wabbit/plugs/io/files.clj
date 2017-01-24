@@ -62,7 +62,7 @@
 ;;
 (defn- postPoll
   "Only look for new files"
-  [co {:keys [recvFolder]} ^File f action]
+  [^Pluggable co {:keys [recvFolder]} ^File f action]
   (let
     [orig (.getName f)]
     (if-some
@@ -71,9 +71,9 @@
             (try!
               (doto->> (io/file recvFolder orig)
                        (FileUtils/moveFile f))))]
-      (->> (evt<> co {:fname orig
-                      :fp cf
-                      :action action})
+      (->> (evt<> (.parent co)
+                  {:fname orig
+                   :fp cf :action action})
            (dispatch! )))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -97,7 +97,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- init
+(defn- init2
   ""
   [conf cfg0]
   (let
@@ -147,7 +147,8 @@
   specdef
   {:info {:name "File Picker"
           :version "1.0.0"}
-   :conf {:targetFolder "/home/dropbox"
+   :conf {:$pluggable ::FilePicker
+          :targetFolder "/home/dropbox"
           :recvFolder "/home/joe"
           :fmask ""
           :intervalSecs 300
@@ -163,31 +164,34 @@
 (defn FilePicker
   ""
   ^Pluggable
-  ([co] (FilePicker co (FilePickerSpec)))
-  ([co {:keys [conf] :as spec}]
+  ([] (FilePicker (FilePickerSpec)))
+  ([{:keys [conf] :as pspec}]
    (let
-     [mee (keyword (juid))
-      impl (muble<>)
-      schedule
+     [impl (muble<>)
+      sch
       #(let [_ %]
          (log/info "apache io monitor starting...")
          (some-> ^FileAlterationMonitor
-                 (.getv impl mee) (.start)))
-      par (threadedTimer {:schedule schedule})]
+                 (.getv impl :$mon) (.start)))]
      (reify Pluggable
-       (spec [_] specdef)
+       (setParent [_ p] (.setv impl :$parent p))
+       (parent [_] (.getv impl :$parent))
+       (config [_] (dissoc (.intern impl)
+                           :$mon :$funcs :$parent))
+       (spec [_] pspec)
        (init [_ arg]
-         (.copyEx impl (init conf arg)))
-       (config [_] (.intern impl))
-       (start [_ _]
-         (let [m (fileMon<> co (.intern impl))]
-           (.setv impl mee m)
-           ((:start par) (.intern impl))))
+         (->> (threadedTimer {:$schedule sch})
+              (.setv impl :$funcs))
+         (.copyEx impl (init2 conf arg)))
+       (start [this _]
+         (let [m (fileMon<> this
+                            (.intern impl))]
+           (.setv impl :$mon m)
+           ((:$start (.getv impl :$funcs)) (.intern impl))))
        (stop [_]
          (log/info "apache io monitor stopping...")
          (some-> ^FileAlterationMonitor
-                 (.getv impl mee) (.stop))
-         (.unsetv impl mee))))))
+                 (.unsetv impl :$mon) (.stop)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF

@@ -302,15 +302,15 @@
 ;;
 (defn- boot<>
   ""
-  [co]
+  [^Pluggable co]
   (let
-    [cfg (.config ^Pluglet co)
+    [cfg (.config co)
      bs
      (httpServer<>
        (proxy [CPDecorator][]
          (forH1 [_]
            (ihandler<>
-             #(h1Handler->onRead %1 co %2)))) cfg)
+             #(h1Handler->onRead %1 (.parent co) %2)))) cfg)
      ch (startServer bs cfg)]
     [bs ch]))
 
@@ -371,6 +371,7 @@
   {:info {:name "HTTP Server"
           :version "1.0.0"}
    :conf {:maxInMemory (* 1024 1024 4)
+          :$pluggable ::HTTP
           :maxContentSize -1
           :waitMillis 0
           :sockTimeOut 0
@@ -385,27 +386,29 @@
 ;;
 (defn- httpXXX<>
   ""
-  [co {:keys [conf] :as spec}]
+  [{:keys [conf] :as pspec}]
   (let
-    [pkey (.pkey (.server ^Pluglet co))
-     bee (keyword (juid))
-     cee (keyword (juid))
-     impl (muble<>)]
+    [impl (muble<>)]
     (reify Pluggable
-      (spec [_] httpspecdef)
-      (init [_ arg]
-        (.copyEx impl
-                 (httpBasicConfig pkey conf arg)))
-      (start [_ _]
-        (let [[bs ch] (boot<> co)]
-          (.setv impl bee bs)
-          (.setv impl cee ch)))
+      (setParent [_ p] (.setv impl :$parent p))
+      (parent [_] (.getv impl :$parent))
+      (config [_] (dissoc (.intern impl)
+                          :$parent :$boot :$chan))
+      (spec [_] pspec)
+      (init [this arg]
+        (let [^Pluglet pg (.parent this)
+              k (.. pg server pkey)]
+          (.copyEx impl
+                   (httpBasicConfig k conf arg))))
+      (start [this _]
+        (let [[bs ch] (boot<> this)]
+          (.setv impl :$boot bs)
+          (.setv impl :$chan ch)))
       (stop [_]
-        (when-some [c (.getv impl cee)]
-          (stopServer c)
-          (.unsetv impl bee)
-          (.unsetv impl cee)))
-      (config [_] (.intern impl)))))
+        (when-some
+          [c (.unsetv impl :$chan)]
+          (stopServer c))
+        (.unsetv impl :$boot)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -433,6 +436,7 @@
    :info {:name "Web Site"
           :version "1.0.0"}
    :conf {:maxInMemory (* 1024 1024 4)
+          :$pluggable ::WebMVC
           :maxContentSize -1
           :waitMillis 0
           :sockTimeOut 0
@@ -463,30 +467,32 @@
 ;;
 (defn- httpMVC<>
   ""
-  [co {:keys [conf] :as spec}]
+  [{:keys [conf] :as pspec}]
   (let
-    [pkey (.pkey (.server ^Pluglet co))
-     bee (keyword (juid))
-     cee (keyword (juid))
-     impl (muble<>)]
+    [impl (muble<>)]
     (reify Pluggable
-      (spec [_] mvcspecdef)
-      (init [_ arg]
-        (.copyEx impl
-                 (httpBasicConfig pkey conf arg))
-        (.setv impl
-               :ftlCfg
-               (ftl/genFtlConfig {:root arg})))
-      (start [_ _]
-        (let [[bs ch] (boot<> co)]
-          (.setv impl bee bs)
-          (.setv impl cee ch)))
+      (setParent [_ p] (.setv impl :$parent p))
+      (parent [_] (.getv impl :$parent))
+      (config [_] (dissoc (.intern impl)
+                          :$parent :$boot :$chan))
+      (spec [_] pspec)
+      (init [this arg]
+        (let [^Pluglet pg (.parent this)
+              k (.. pg server pkey)]
+          (.copyEx impl
+                   (httpBasicConfig k conf arg))
+          (.setv impl
+                 :ftlCfg
+                 (ftl/genFtlConfig {:root arg}))))
+      (start [this _]
+        (let [[bs ch] (boot<> this)]
+          (.setv impl :$boot bs)
+          (.setv impl :$chan ch)))
       (stop [_]
-        (when-some [c (.getv impl cee)]
-          (stopServer c)
-          (.unsetv impl bee)
-          (.unsetv impl cee)))
-      (config [_] (.intern impl)))))
+        (when-some
+          [c (.unsetv impl :$chan)]
+          (stopServer c))
+        (.unsetv impl :$boot)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -497,8 +503,8 @@
 (defn WebMVC
   ""
   ^Pluggable
-  ([co] (WebMVC co (WebMVCSpec)))
-  ([co spec] (httpMVC<> co spec)))
+  ([] (WebMVC (WebMVCSpec)))
+  ([spec] (httpMVC<> spec)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -509,8 +515,8 @@
 (defn HTTP
   ""
   ^Pluggable
-  ([co] (HTTP co (HTTPSpec)))
-  ([co spec] (httpXXX<> co spec)))
+  ([] (HTTP (HTTPSpec)))
+  ([spec] (httpXXX<> spec)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF

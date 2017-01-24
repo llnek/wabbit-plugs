@@ -111,8 +111,7 @@
     (.setProvider ss sun)
     (doto (.getx co)
       (.setv :proto proto)
-      (.setv :session ss))
-    co))
+      (.setv :session ss))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -225,7 +224,8 @@
   popspecdef
   {:info {:name "POP3 Client"
           :version "1.0.0"}
-   :conf {:host "pop.gmail.com"
+   :conf {:$pluggable ::POP3
+          :host "pop.gmail.com"
           :port 995
           :deleteMsg? false
           :username "joe"
@@ -243,25 +243,31 @@
 (defn POP3
   ""
   ^Pluggable
-  ([co] (POP3 co (POP3Spec)))
-  ([co {:keys [conf] :as spec}]
+  ([] (POP3 (POP3Spec)))
+  ([{:keys [conf] :as pspec}]
    (let
-     [funcs (threadedTimer {:wakeup #(wake<o> co) })
-      pkey (.pkey (.server ^Pluglet co))
-      impl (muble<>)]
+     [impl (muble<>)]
      (reify Pluggable
-       (spec [_] popspecdef)
-       (config [_] (.intern impl))
-       (start [_ _] ((:start funcs) (.intern impl)))
-       (stop [_] ((:stop funcs)))
-       (init [_ arg]
-         (let [c2 (merge conf
-                         (sanitize pkey arg))
+       (setParent [_ p] (.setv impl :$parent p))
+       (parent [_] (.getv impl :$parent))
+       (config [_] (dissoc (.intern impl)
+                           :$funcs :$parent))
+       (spec [_] pspec)
+       (start [_ _]
+         ((:$start (.getv impl :$funcs)) (.intern impl)))
+       (stop [_]
+         ((:$stop (.getv impl :$funcs))))
+       (init [this arg]
+         (let [^Pluglet pg (.parent this)
+               k (.. pg server pkey)
+               c2 (merge conf (sanitize k arg))
                [z p] (if (:ssl? c2)
                        [cz-pop3s pop3s]
                        [cz-pop3 pop3c])]
+           (->> (threadedTimer {:$wakeup #(wake<o> pg)})
+                (.setv impl :$funcs))
            (.copyEx impl c2)
-           (resolveProvider co z p)))))))
+           (resolveProvider pg z p)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -291,7 +297,8 @@
   imapspecdef
   {:info {:name "IMAP Client"
           :version "1.0.0"}
-   :conf {:host "imap.gmail.com"
+   :conf {:$pluggable ::IMAP
+          :host "imap.gmail.com"
           :port 993
           :deleteMsg? false
           :ssl? true
@@ -310,25 +317,31 @@
 (defn IMAP
   ""
   ^Pluggable
-  ([co] (IMAP co (IMAPSpec)))
-  ([co {:keys [conf] :as spec}]
+  ([] (IMAP (IMAPSpec)))
+  ([{:keys [conf] :as pspec}]
    (let
-     [funcs (threadedTimer {:wakeup #(wake<i> co) })
-      pkey (.pkey (.server ^Pluglet co))
-      impl (muble<>)]
+     [impl (muble<>)]
      (reify Pluggable
-       (spec [_] imapspecdef)
-       (config [_] (.intern impl))
-       (start [_ _] ((:start funcs) (.intern impl)))
-       (stop [_] ((:stop funcs)))
-       (init [_ arg]
-         (let [c2 (merge conf
-                         (sanitize pkey arg))
+       (setParent [_ p] (.setv impl :$parent p))
+       (parent [_] (.getv impl :$parent))
+       (config [_] (dissoc (.intern impl)
+                           :$funcs :$parent))
+       (spec [_] pspec)
+       (start [_ _]
+         ((:$start (.getv impl :$funcs)) (.intern impl)))
+       (stop [_]
+         ((:$stop (.getv impl :$funcs))))
+       (init [this arg]
+         (let [^Pluglet pg (.parent this)
+               k (.. pg server pkey)
+               c2 (merge conf (sanitize k arg))
                [z p] (if (:ssl? c2)
                        [cz-imaps imaps]
                        [cz-imap imap])]
+           (->> (threadedTimer {:$wakeup #(wake<i> pg)})
+                (.setv impl :$funcs))
            (.copyEx impl c2)
-           (resolveProvider co z p)))))))
+           (resolveProvider pg z p)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF

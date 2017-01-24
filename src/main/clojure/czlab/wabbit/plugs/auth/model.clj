@@ -71,7 +71,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn genAuthPluginDDL
+(defn genAuthPlugletDDL
   "Generate db ddl for the auth-plugin"
   ^String
   [spec]
@@ -84,29 +84,29 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defprotocol PluginDDL "Upload the auth-plugin ddl to db" (applyDDL [_]))
+(defprotocol PlugletDDL "Upload the auth-pluglet ddl to db" (applyDDL [_]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(extend-protocol PluginDDL
+(extend-protocol PlugletDDL
 
   JdbcInfo
   (applyDDL [this]
     (when-some [t (matchUrl (.url this))]
       (with-open [c (dbconnect<> this)]
-        (uploadDdl c (genAuthPluginDDL t)))))
+        (uploadDdl c (genAuthPlugletDDL t)))))
 
   JdbcPool
   (applyDDL [this]
     (when-some [t (matchUrl (.dbUrl this))]
-      (uploadDdl this (genAuthPluginDDL t)))))
+      (uploadDdl this (genAuthPlugletDDL t)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn exportAuthPluginDDL
+(defn exportAuthPlugletDDL
   "Output the auth-plugin ddl to file"
   [spec file]
-  (spitUtf8 file (genAuthPluginDDL spec)))
+  (spitUtf8 file (genAuthPlugletDDL spec)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF

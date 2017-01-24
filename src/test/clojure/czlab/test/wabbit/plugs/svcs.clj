@@ -132,7 +132,7 @@
   (is (let [_ (sysProp! "wabbit.mock.mail.proto" "imaps")
             etype :czlab.wabbit.plugs.io.mails/IMAP
             ctr (mocker :exec)
-            s (pluglet<> ctr etype "t")]
+            s (plugletViaType<> ctr etype "t")]
         (reset! result-var 0)
         (.init s
                {:handler "czlab.test.wabbit.plugs.svcs/mailHandler"
@@ -150,7 +150,7 @@
   (is (let [_ (sysProp! "wabbit.mock.mail.proto" "pop3s")
             etype :czlab.wabbit.plugs.io.mails/POP3
             ctr (mocker :exec)
-            s (pluglet<> ctr etype "t")]
+            s (plugletViaType<> ctr etype "t")]
         (reset! result-var 0)
         (.init s
                {:handler "czlab.test.wabbit.plugs.svcs/mailHandler"
@@ -167,7 +167,7 @@
 
   (is (let [etype :czlab.wabbit.plugs.io.http/HTTP
             ctr (mocker :exec)
-            s (pluglet<> ctr etype "t")]
+            s (plugletViaType<> ctr etype "t")]
         (.init s
                {:handler "czlab.test.wabbit.plugs.svcs/httpHandler"
                 :host "localhost"
@@ -198,7 +198,7 @@
                :jmsPwd "anonymous"
                :handler "czlab.test.wabbit.plugs.svcs/jmsHandler"}
             ctr (mocker :exec)
-            s (pluglet<> ctr etype "t")]
+            s (plugletViaType<> ctr etype "t")]
         (reset! result-var 0)
         (.init s c)
         (.start s nil)
@@ -221,7 +221,7 @@
                :jmsPwd "anonymous"
                :handler "czlab.test.wabbit.plugs.svcs/jmsHandler"}
             ctr (mocker :exec)
-            s (pluglet<> ctr etype "t")]
+            s (plugletViaType<> ctr etype "t")]
         (reset! result-var 0)
         (.init s c)
         (.start s nil)
@@ -237,7 +237,7 @@
                :port port
                :handler "czlab.test.wabbit.plugs.svcs/sockHandler"}
             ctr (mocker :exec)
-            s (pluglet<> ctr etype "t")]
+            s (plugletViaType<> ctr etype "t")]
         (.init s c)
         (.start s nil)
         (reset! result-var 0)
@@ -260,7 +260,7 @@
             c {:delaySecs 1
                :handler "czlab.test.wabbit.plugs.svcs/testHandler"}
             ctr (mocker :exec)
-            s (pluglet<> ctr etype "t")]
+            s (plugletViaType<> ctr etype "t")]
         (reset! result-var 0)
         (.init s c)
         (.start s nil)
@@ -274,7 +274,7 @@
                :intervalSecs 1
                :handler "czlab.test.wabbit.plugs.svcs/testHandler"}
             ctr (mocker :exec)
-            s (pluglet<> ctr etype "t")]
+            s (plugletViaType<> ctr etype "t")]
         (reset! result-var 0)
         (.init s c)
         (.start s nil)
@@ -295,7 +295,7 @@
                :delaySecs 0
                :handler "czlab.test.wabbit.plugs.svcs/fileHandler"}
             ctr (mocker :exec)
-            s (pluglet<> ctr etype "t")]
+            s (plugletViaType<> ctr etype "t")]
         (.init s c)
         (deleteDir from)
         (deleteDir to)

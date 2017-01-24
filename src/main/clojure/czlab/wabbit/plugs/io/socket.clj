@@ -50,10 +50,10 @@
 ;;
 (defn- sockItDown
   ""
-  [co soc]
+  [^Pluggable co soc]
   (try!
     (log/debug "opened socket: %s" soc)
-    (dispatch! (evt<> co {:socket soc}))))
+    (dispatch! (evt<> (.parent co) {:socket soc}))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -79,7 +79,7 @@
   specdef
   {:info {:name "TCP Socket Server"
           :version "1.0.0"}
-   :conf {:pluggable ::SocketIO
+   :conf {:$pluggable ::SocketIO
           :host ""
           :port 7551
           :handler nil}})
@@ -93,32 +93,36 @@
 (defn SocketIO
   ""
   ^Pluggable
-  ([co] (SocketIO co (SocketIOSpec)))
-  ([co {:keys [conf] :as spec}]
+  ([] (SocketIO (SocketIOSpec)))
+  ([{:keys [conf] :as pspec}]
    (let
-     [see (keyword (juid))
-      impl (muble<>)]
+     [impl (muble<>)]
      (reify
        Pluggable
-       (spec [_] specdef)
+       (setParent [_ p] (.setv impl :$parent p))
+       (parent [_] (.getv impl :$parent))
+       (config [_] (dissoc (.intern impl)
+                           :$parent :$ssoc))
+       (spec [_] pspec)
        (init [_ arg]
          (.copyEx impl (merge conf arg)))
-       (config [_] (.intern impl))
-       (start [_ _]
+       (start [this _]
          (when-some
            [ss (ssoc<> (.intern impl))]
-           (.setv impl see ss)
+           (.setv impl :$ssoc ss)
            (async!
              #(while (not (.isClosed ss))
                 (try
-                  (sockItDown co (.accept ss))
-                  (catch Throwable _
-                    (.unsetv impl see) (closeQ ss))))
+                  (sockItDown this (.accept ss))
+                  (catch Throwable t
+                    (let [m (.getMessage t)]
+                      (if (and (hasNoCase? m "socket")
+                               (hasNoCase? m "closed"))
+                        nil
+                        (log/warn t ""))))))
              {:cl (getCldr)})))
        (stop [_]
-         (when-some [s (.getv impl see)]
-           (.unsetv impl see)
-           (closeQ s)))))))
+         (closeQ (.unsetv impl :$ssoc)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF

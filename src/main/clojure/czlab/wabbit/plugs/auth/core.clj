@@ -63,7 +63,7 @@
             Job
             Script]
            [czlab.wabbit.plugs.auth
-            AuthPlugin
+            AuthPluglet
             AuthError
             UnknownUser
             DuplicateUser]
@@ -466,7 +466,7 @@
                 (catch BadDataError _ {:e _}))
          info (or info {})
          rb (I18N/base)
-         ^AuthPlugin
+         ^AuthPluglet
          pa (-> ^Muble (.. evt source server getx)
                 (.getv :plugins)
                 (:auth ))]
@@ -527,7 +527,7 @@
                 (catch BadDataError _ {:e _}))
          info (or info {})
          rb (I18N/base)
-         ^AuthPlugin
+         ^AuthPluglet
          pa (-> ^Muble
                 (.. evt source server getx)
                 (.getv :plugins)
@@ -564,12 +564,13 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- authPlugin<>
+(defn- authPluglet<>
   ""
   ^AuthPluglet
   [^Execvisor ctr]
 
-  (let [impl (muble<>)]
+  (let [pid (str "auth#" (seqint2))
+        impl (muble<>)]
     (reify AuthPluglet
 
       (isEnabled [this]
@@ -591,13 +592,13 @@
         (assertPluginOK (.dftDbPool ctr))
         (initShiro (.homeDir ctr)
                    (.pkey ctr))
-        (log/info "AuthPlugin started"))
+        (log/info "AuthPluglet started"))
 
       (stop [_]
-        (log/info "AuthPlugin stopped"))
+        (log/info "AuthPluglet stopped"))
 
       (dispose [_]
-        (log/info "AuthPlugin disposed"))
+        (log/info "AuthPluglet disposed"))
 
       (checkAction [_ acctObj action] )
 
@@ -698,7 +699,7 @@
 
           (= "gen-sql" cmd)
           (if (> (count args) 3)
-            (exportAuthPluginDDL t
+            (exportAuthPlugletDDL t
                                  (io/file (nth args 3)))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

@@ -86,11 +86,11 @@
   ""
   [funcs]
   (let
-    [wake (or (:wakeup funcs)
+    [wake (or (:$wakeup funcs)
               (constantly nil))
      loopy (volatile! true)
      schedule
-     (or (:schedule funcs)
+     (or (:$schedule funcs)
          (fn [c]
            (async!
             #(while @loopy
@@ -98,7 +98,7 @@
                (pause (:intervalMillis c)))
             {:cl (getCldr)})))]
     (doto
-      {:start
+      {:$start
        (fn [cfg]
          (let
            [{:keys [intervalSecs
@@ -110,7 +110,7 @@
              (configOnce (Timer.)
                          [delayWhen (s2ms delaySecs)] func)
              (func))))
-       :stop
+       :$stop
        #(vreset! loopy false)})))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -136,34 +136,10 @@
   manyspecdef
   {:info {:name "Repeating Timer"
           :version "1.0.0"}
-   :conf {:intervalSecs 300
+   :conf {:$pluggable ::RepeatingTimer
+          :intervalSecs 300
           :delaySecs 0
           :handler nil}})
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-(defn- xxxTimer<m>
-  ""
-  [co {:keys [conf] :as spec} repeat?]
-  (let
-    [tee (keyword (juid))
-     impl (muble<>)
-     stop #(do (try! (some-> ^Timer
-                             (.getv impl tee) (.cancel)))
-               (.unsetv impl tee))
-     wakeup #(do (dispatch! (evt<> co repeat?))
-                 (if-not repeat? (stop)))]
-    (reify
-      Pluggable
-      (spec [_] manyspecdef)
-      (config [_] (dissoc (.intern impl) tee))
-      (init [_ arg]
-        (.copyEx impl (merge conf arg)))
-      (start [_ arg]
-        (let [t (Timer. true)]
-          (.setv impl tee t)
-          (configTimer t wakeup (.intern impl) repeat?)))
-      (stop [_] stop))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -172,33 +148,40 @@
   onespecdef
   {:info {:name "One Shot Timer"
           :version "1.0.0"}
-   :conf {:delaySecs 0 :handler nil}})
+   :conf {:$pluggable ::OnceTimer
+          :delaySecs 0
+          :handler nil}})
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- xxxTimer<1>
+(defn- xxxTimer<>
   ""
-  [co {:keys [conf] :as spec} repeat?]
+  [{:keys [conf] :as tspec} repeat?]
   (let
-    [tee (keyword (juid))
-     impl (muble<>)
-     stop #(do (try! (some-> ^Timer
-                             (.getv impl tee) (.cancel)))
-               (.unsetv impl tee))
-     wakeup #(do (dispatch! (evt<> co repeat?))
-                 (if-not repeat? (stop)))]
+    [impl (muble<>)
+     stop #(try!
+             (some-> ^Timer
+                     (.unsetv impl :$timer)
+                     (.cancel)))]
     (reify
       Pluggable
-      (spec [_] onespecdef)
-      (config [_] (dissoc (.intern impl) tee))
+      (setParent [_ p] (.setv impl :$parent p))
+      (parent [_] (.getv impl :$parent))
+      (config [_] (dissoc (.intern impl)
+                          :$timer :$parent))
+      (spec [_] tspec)
       (init [_ arg]
         (.copyEx impl (merge conf arg)))
-      (start [_ arg]
-        (let [t (Timer. true)]
-          (.setv impl tee t)
-          (configTimer t wakeup (.intern impl) repeat?)))
+      (start [this arg]
+        (let [t (doto->>
+                  (Timer. true)
+                  (.setv impl :$timer))
+              pg (.parent this)
+              w #(do (dispatch!
+                       (evt<> pg repeat?))
+                     (if-not repeat? (stop)))]
+          (configTimer t w (.intern impl) repeat?)))
       (stop [_] stop))))
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -209,8 +192,8 @@
 (defn RepeatingTimer
   ""
   ^Pluggable
-  ([co] (RepeatingTimer co (RepeatingTimerSpec)))
-  ([co spec] (xxxTimer<1> co spec true)))
+  ([] (RepeatingTimer (RepeatingTimerSpec)))
+  ([spec] (xxxTimer<> spec true)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -221,8 +204,8 @@
 (defn OnceTimer
   ""
   ^Pluggable
-  ([co] (OnceTimer co (OnceTimerSpec)))
-  ([co spec] (xxxTimer<m> co spec false)))
+  ([] (OnceTimer (OnceTimerSpec)))
+  ([spec] (xxxTimer<> spec false)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF
