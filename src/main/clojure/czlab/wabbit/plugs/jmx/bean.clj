@@ -296,7 +296,7 @@
             %1))
        dcls)
      rc
-     (preduce<map>
+     (preduce<vec>
        #(let [^Field f %2]
           (if-not (.isAccessible f)
             (conj! %1 (beanFieldInfo<> f))
