@@ -478,12 +478,14 @@
       (spec [_] pspec)
       (init [this arg]
         (let [^Pluglet pg (.parent this)
+              h (.. pg server homeDir)
+              root (io/file h "public/pages")
               k (.. pg server pkey)]
           (.copyEx impl
                    (httpBasicConfig k conf arg))
           (.setv impl
                  :ftlCfg
-                 (ftl/genFtlConfig {:root arg}))))
+                 (ftl/genFtlConfig {:root root}))))
       (start [this _]
         (let [[bs ch] (boot<> this)]
           (.setv impl :$boot bs)
