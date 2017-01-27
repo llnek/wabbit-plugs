@@ -181,7 +181,7 @@
                        (evt<> pg repeat?))
                      (if-not repeat? (stop)))]
           (configTimer t w (.intern impl) repeat?)))
-      (stop [_] stop))))
+      (stop [_] (stop)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

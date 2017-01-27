@@ -335,11 +335,12 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn hookShutdown
+(defn Discarder!
   ""
-  [^Atom gist func arg]
-  (let [ch (-> (discardHTTPD<> func)
-               (startServer arg))]
+  [func arg]
+  (let
+    [ch (-> (discardHTTPD<> func)
+            (startServer arg))]
     #(stopServer ch)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
