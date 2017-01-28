@@ -243,8 +243,8 @@
 (defn JMS
   ""
   ^Pluggable
-  ([] (JMS (JMSSpec)))
-  ([{:keys [conf] :as pspec}]
+  ([_] (JMS _ (JMSSpec)))
+  ([_ {:keys [conf] :as pspec}]
    (let
      [impl (muble<>)]
      (reify

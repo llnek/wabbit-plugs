@@ -243,8 +243,8 @@
 (defn POP3
   ""
   ^Pluggable
-  ([] (POP3 (POP3Spec)))
-  ([{:keys [conf] :as pspec}]
+  ([_] (POP3 _ (POP3Spec)))
+  ([_ {:keys [conf] :as pspec}]
    (let
      [impl (muble<>)]
      (reify Pluggable
@@ -317,8 +317,8 @@
 (defn IMAP
   ""
   ^Pluggable
-  ([] (IMAP (IMAPSpec)))
-  ([{:keys [conf] :as pspec}]
+  ([_] (IMAP _ (IMAPSpec)))
+  ([_ {:keys [conf] :as pspec}]
    (let
      [impl (muble<>)]
      (reify Pluggable

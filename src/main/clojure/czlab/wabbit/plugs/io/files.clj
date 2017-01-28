@@ -164,8 +164,8 @@
 (defn FilePicker
   ""
   ^Pluggable
-  ([] (FilePicker (FilePickerSpec)))
-  ([{:keys [conf] :as pspec}]
+  ([_] (FilePicker _ (FilePickerSpec)))
+  ([_ {:keys [conf] :as pspec}]
    (let
      [impl (muble<>)
       sch

@@ -192,8 +192,8 @@
 (defn RepeatingTimer
   ""
   ^Pluggable
-  ([] (RepeatingTimer (RepeatingTimerSpec)))
-  ([spec] (xxxTimer<> spec true)))
+  ([_] (RepeatingTimer _ (RepeatingTimerSpec)))
+  ([_ spec] (xxxTimer<> spec true)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -204,8 +204,8 @@
 (defn OnceTimer
   ""
   ^Pluggable
-  ([] (OnceTimer (OnceTimerSpec)))
-  ([spec] (xxxTimer<> spec false)))
+  ([_] (OnceTimer _ (OnceTimerSpec)))
+  ([_ spec] (xxxTimer<> spec false)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF

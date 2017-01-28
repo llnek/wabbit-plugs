@@ -93,8 +93,8 @@
 (defn SocketIO
   ""
   ^Pluggable
-  ([] (SocketIO (SocketIOSpec)))
-  ([{:keys [conf] :as pspec}]
+  ([_] (SocketIO _ (SocketIOSpec)))
+  ([_ {:keys [conf] :as pspec}]
    (let
      [impl (muble<>)]
      (reify
