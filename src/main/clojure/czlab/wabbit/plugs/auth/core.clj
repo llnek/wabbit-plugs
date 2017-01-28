@@ -221,7 +221,7 @@
    by looking into the db"
   [^JdbcPool pool]
   {:pre [(some? pool)]}
-  (let [tbl (->> :czlab.wabbit.auth.model/LoginAccount
+  (let [tbl (->> :czlab.wabbit.plugs.auth.model/LoginAccount
                  (.get ^Schema *auth-meta-cache*)
                  (dbtable))]
     (when-not (tableExist? pool tbl)
@@ -250,7 +250,7 @@
   [^SQLr sql ^String role ^String desc]
   {:pre [(some? sql)]}
   (let [m (.get (.metas sql)
-                :czlab.wabbit.auth.model/AuthRole)
+                :czlab.wabbit.plugs.auth.model/AuthRole)
         rc (-> (dbpojo<> m)
                (dbSetFlds* {:name role
                             :desc desc}))]
@@ -263,7 +263,7 @@
   [^SQLr sql ^String role]
   {:pre [(some? sql)]}
   (let [m (.get (.metas sql)
-                :czlab.wabbit.auth.model/AuthRole)]
+                :czlab.wabbit.plugs.auth.model/AuthRole)]
     (.exec sql
            (format
              "delete from %s where %s =?"
@@ -277,7 +277,7 @@
   ^Iterable
   [^SQLr sql]
   {:pre [(some? sql)]}
-  (.findAll sql :czlab.wabbit.auth.model/AuthRole))
+  (.findAll sql :czlab.wabbit.plugs.auth.model/AuthRole))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -292,7 +292,7 @@
   ([^SQLr sql ^String user ^IPassword pwdObj props roleObjs]
    {:pre [(some? sql)(hgl? user)]}
    (let [m (.get (.metas sql)
-                 :czlab.wabbit.auth.model/LoginAccount)
+                 :czlab.wabbit.plugs.auth.model/LoginAccount)
          ps (if (some? pwdObj)
               (:hash (.hashed pwdObj)))
          acc
@@ -305,7 +305,7 @@
      ;; previous insert. That is, if we fail to set a role, it's
      ;; assumed ok for the account to remain inserted
      (doseq [r roleObjs]
-       (dbSetM2M {:joined :czlab.wabbit.auth.model/AccountRoles
+       (dbSetM2M {:joined :czlab.wabbit.plugs.auth.model/AccountRoles
                   :with sql} acc r))
      (log/debug "created new account %s%s%s%s"
                 "into db: " acc "\nwith meta\n" (meta acc))
@@ -319,7 +319,7 @@
   [^SQLr sql ^String email]
   {:pre [(some? sql)]}
   (.findOne sql
-            :czlab.wabbit.auth.model/LoginAccount
+            :czlab.wabbit.plugs.auth.model/LoginAccount
             {:email (strim email) }))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -330,7 +330,7 @@
   [^SQLr sql ^String user]
   {:pre [(some? sql)]}
   (.findOne sql
-            :czlab.wabbit.auth.model/LoginAccount
+            :czlab.wabbit.plugs.auth.model/LoginAccount
             {:acctid (strim user) }))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -392,7 +392,7 @@
   [^SQLr sql user role]
   {:pre [(some? sql)]}
   (dbClrM2M
-    {:joined :czlab.wabbit.auth.model/AccountRoles :with sql} user role))
+    {:joined :czlab.wabbit.plugs.auth.model/AccountRoles :with sql} user role))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -402,7 +402,7 @@
   [^SQLr sql user role]
   {:pre [(some? sql)]}
   (dbSetM2M
-    {:joined :czlab.wabbit.auth.model/AccountRoles :with sql} user role))
+    {:joined :czlab.wabbit.plugs.auth.model/AccountRoles :with sql} user role))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -419,7 +419,7 @@
   [^SQLr sql ^String user]
   {:pre [(some? sql)]}
   (let [m (.get (.metas sql)
-                :czlab.wabbit.auth.model/LoginAccount)]
+                :czlab.wabbit.plugs.auth.model/LoginAccount)]
     (.exec sql
            (format
              "delete from %s where %s =?"
@@ -433,14 +433,14 @@
   ^Iterable
   [^SQLr sql]
   {:pre [(some? sql)]}
-  (.findAll sql :czlab.wabbit.auth.model/LoginAccount))
+  (.findAll sql :czlab.wabbit.plugs.auth.model/LoginAccount))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- initShiro
   ""
   [^File homeDir ^String podKey]
-  (let [f (io/file homeDir "ext/shiro.ini")]
+  (let [f (io/file homeDir "etc/shiro.ini")]
     (if-not (fileRead? f)
       (trap! ConfigError "Missing shiro ini file"))
     (-> (io/as-url f)
