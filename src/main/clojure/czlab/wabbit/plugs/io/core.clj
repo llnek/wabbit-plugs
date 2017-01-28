@@ -40,7 +40,7 @@
              evt (.origin job)]
          (do->nil
            (log/error "event '%s' {job:#s} dropped"
-                      (:typeid (meta evt)) (.id job)))))))
+                      (gtid evt) (.id job)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -76,20 +76,22 @@
       job (job<> (.core ctr) nil evt)
       wf (try! (.call rts cb))]
      (log/debug (str "event type = %s\n"
-                     "event opts = %s\n"
-                     "event router = %s\n"
-                     "io-handler = %s")
-                (:typeid (meta src)) arg c1 c0)
+                     "event arg = %s\n"
+                     "event cb = %s")
+                (gtid src) arg c1 c0)
      (try
        (log/debug "job#%s => %s" (.id job) (.id src))
        (.setv job evt-opts arg)
-       (cond
-         (inst? WorkStream wf)
-         (do->nil (.execWith ^WorkStream wf job))
-         (fn? wf)
-         (do->nil (wf job))
-         :else
-         (throwBadArg "Want WorkStream, got %s" (class wf)))
+       (do->nil
+         (cond
+           (inst? WorkStream wf)
+           (.execWith ^WorkStream wf job)
+           (fn? wf)
+           (doto (workStream<>
+                   (script<> #(wf %2) nil))
+             (.execWith job))
+           :else
+           (throwBadArg "Want WorkStream, got %s" (class wf))))
        (catch Throwable _
          (error! src job _))))))
 
