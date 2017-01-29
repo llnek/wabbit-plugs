@@ -316,22 +316,18 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- processOrphan
+(defn ProcessOrphan
   ""
-  [_]
+  [^Job job error]
   ;; 500 or 503
-  (workStream<>
-    (script<>
-      #(let [^Job job %2
-             s (or (.getv job :statusCode)
-                   500)
-             ^HttpMsg evt (.origin job)]
-         (->> (httpResult<>
-                (.socket evt)
-                (.msgGist evt)
-                (HttpResponseStatus/valueOf s))
-              (replyResult (.socket evt)))
-         nil))))
+  (let [s (or (.getv job :statusCode)
+              500)
+        ^HttpMsg evt (.origin job)]
+    (->> (httpResult<>
+           (.socket evt)
+           (.msgGist evt)
+           (HttpResponseStatus/valueOf s))
+         (replyResult (.socket evt)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -369,7 +365,8 @@
 (def
   ^:private
   httpspecdef
-  {:info {:name "HTTP Server"
+  {:eror :czlab.wabbit.plugs.io.http/ProcessOrphan
+   :info {:name "HTTP Server"
           :version "1.0.0"}
    :conf {:maxInMemory (* 1024 1024 4)
           :$pluggable ::HTTP
@@ -434,6 +431,7 @@
   ^:private
   mvcspecdef
   {:deps [:czlab.wabbit.plugs.auth.core/WebAuth]
+   :eror :czlab.wabbit.plugs.io.http/ProcessOrphan
    :info {:name "Web Site"
           :version "1.0.0"}
    :conf {:maxInMemory (* 1024 1024 4)

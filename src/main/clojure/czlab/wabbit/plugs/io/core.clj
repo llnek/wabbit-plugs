@@ -32,15 +32,12 @@
 ;;
 (defn- processOrphan
   ""
-  ^WorkStream
-  [_]
-  (workStream<>
-    (script<>
-      #(let [^Job job %2
-             evt (.origin job)]
-         (do->nil
-           (log/error "event '%s' {job:#s} dropped"
-                      (gtid evt) (.id job)))))))
+  ([job] (processOrphan job nil))
+  ([^Job job ^Throwable e]
+   (let [evt (.origin job)]
+     (some-> e (log/exception ))
+     (log/error (str "event [%s] "
+                     "job#%s dropped") (gtid evt) (.id job)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -54,9 +51,12 @@
 ;;
 (defn- error!
   ""
-  [co job e]
-  (log/exception e)
-  (some-> (processOrphan job) (.execWith job)))
+  [^Pluglet co job e]
+  (if-some+
+    [r (strKW (:eror (.spec co)))]
+    (.callEx (.. co server cljrt)
+             r
+             (vargs* Object job e))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -74,7 +74,9 @@
       rts (.cljrt ctr)
       cb (stror c1 c0)
       job (job<> (.core ctr) nil evt)
-      wf (try! (.call rts cb))]
+      wf (or
+           (try! (.call rts cb))
+           (error! src job nil))]
      (log/debug (str "event type = %s\n"
                      "event arg = %s\n"
                      "event cb = %s")
@@ -91,9 +93,7 @@
                    (script<> #(wf %2) nil))
              (.execWith job))
            :else
-           (throwBadArg "Want WorkStream, got %s" (class wf))))
-       (catch Throwable _
-         (error! src job _))))))
+           (processOrphan job)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF
