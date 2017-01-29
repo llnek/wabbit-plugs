@@ -339,7 +339,7 @@
   ""
   [func arg]
   (let
-    [ch (-> (discardHTTPD<> func)
+    [ch (-> (discardHTTPD<> func arg)
             (startServer arg))]
     #(stopServer ch)))
 
