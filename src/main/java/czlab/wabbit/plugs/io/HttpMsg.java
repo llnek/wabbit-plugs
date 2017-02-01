@@ -10,8 +10,8 @@
 
 package czlab.wabbit.plugs.io;
 
-import czlab.convoy.net.HttpInvoke;
 import czlab.wabbit.ctl.PlugMsg;
+import czlab.convoy.HttpInvoke;
 import czlab.jasal.Triggerable;
 
 /**

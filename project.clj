@@ -16,6 +16,7 @@
    [org.apache.shiro/shiro-core "1.3.2"]
    [io.czlab/proto "1.0.0" :scope "test"]
    [io.czlab/flux "1.0.0"]
+   [io.czlab/nettio "1.0.0"]
    [io.czlab/wabbit "1.0.0"]]
 
   :plugins [[lein-codox "0.10.2"]

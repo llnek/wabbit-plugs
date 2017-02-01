@@ -11,7 +11,7 @@
 
   czlab.wabbit.plugs.io.http
 
-  (:require [czlab.convoy.net.util :refer [parseBasicAuth]]
+  (:require [czlab.convoy.util :refer [parseBasicAuth]]
             [czlab.basal.io :refer [xdata<> slurpUtf8]]
             [czlab.basal.format :refer [readEdn]]
             [czlab.twisty.codec :refer [passwd<>]]
@@ -20,38 +20,39 @@
             [clojure.java.io :as io]
             [clojure.string :as cs])
 
-  (:use [czlab.wabbit.base.core]
-        [czlab.convoy.netty.discarder]
-        [czlab.convoy.netty.server]
-        [czlab.convoy.netty.routes]
-        [czlab.convoy.netty.core]
-        [czlab.convoy.net.core]
+  (:use [czlab.wabbit.plugs.io.core]
+        [czlab.wabbit.base.core]
+        [czlab.nettio.discarder]
         [czlab.flux.wflow.core]
-        [czlab.wabbit.plugs.io.core]
+        ;;[czlab.nettio.server]
+        [czlab.convoy.server]
+        [czlab.convoy.routes]
+        [czlab.nettio.core]
+        [czlab.convoy.core]
         [czlab.twisty.ssl]
         [czlab.basal.core]
         [czlab.basal.str]
         [czlab.basal.meta])
 
-  (:import [czlab.convoy.net HttpResult RouteCracker RouteInfo]
-           [czlab.convoy.netty WholeRequest InboundHandler]
-           [czlab.convoy.netty CPDecorator TcpPipeline]
+  (:import [czlab.convoy HttpResult RouteCracker RouteInfo]
+           [czlab.nettio WholeRequest InboundHandler]
            [java.nio.channels ClosedChannelException]
            [io.netty.handler.codec.http.websocketx
             TextWebSocketFrame
             WebSocketFrame
             BinaryWebSocketFrame]
+           [czlab.wabbit.ctl Pluggable Pluglet PlugMsg]
+           [io.netty.handler.codec DecoderException]
+           [czlab.wabbit.plugs.io HttpMsg WSockMsg]
            [io.netty.handler.codec.http.cookie
             ServerCookieDecoder
             ServerCookieEncoder]
-           [io.netty.handler.codec DecoderException]
            [io.netty.bootstrap ServerBootstrap]
            [io.netty.buffer ByteBuf Unpooled]
            [io.netty.handler.ssl SslHandler]
+           [clojure.lang Atom APersistentMap]
            [czlab.flux.wflow Job]
            [czlab.wabbit.sys Execvisor]
-           [czlab.wabbit.ctl Pluggable Pluglet PlugMsg]
-           [clojure.lang Atom APersistentMap]
            [czlab.twisty IPassword]
            [java.util Timer TimerTask]
            [io.netty.handler.codec.http
@@ -83,7 +84,6 @@
             InetAddress
             SocketAddress
             InetSocketAddress]
-           [czlab.wabbit.plugs.io HttpMsg WSockMsg]
            [io.netty.channel
             Channel
             ChannelHandler
@@ -116,30 +116,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- maybeLoadRoutes
-  [cfg]
-  (let [{:keys [routes]} cfg]
-    (when-not (empty? routes)
-      (loadRoutes routes))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-(defn- javaToCookie
   ""
-  ^Cookie
-  [^HttpCookie c]
-  ;; stick with version 0, Java's HttpCookie defaults to 1 but that
-  ;; screws up the Path attribute on the wire => it's quoted but
-  ;; browser seems to not like it and mis-interpret it.
-  ;; Netty's cookie defaults to 0, which is cool with me.
-  (doto (DefaultCookie. (.getName c)
-                        (.getValue c))
-    ;;(.setComment (.getComment c))
-    (.setDomain (.getDomain c))
-    (.setMaxAge (.getMaxAge c))
-    (.setPath (.getPath c))
-    ;;(.setDiscard (.getDiscard c))
-    (.setVersion 0)
-    (.setHttpOnly (.isHttpOnly c))))
+  [{:keys [routes]}]
+  (when-not (empty? routes) (loadRoutes routes)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -147,16 +126,6 @@
   ""
   [^HttpMsg evt ^ChannelFuture cf]
   (closeCF cf (:isKeepAlive? (.msgGist evt))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-(defn- csToNetty
-  ""
-  [cookies]
-  (preduce<vec>
-    #(->> (.encode ServerCookieEncoder/STRICT ^Cookie %2)
-          (conj! %1 ))
-    (map #(javaToCookie %) (seq cookies))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -171,34 +140,34 @@
          (.writeAndFlush ch )
          (maybeClose evt ))
     (catch ClosedChannelException _
-      (log/warn "closedChannelEx thrown"))
+      (log/warn "channel closed already"))
     (catch Throwable t# (log/exception t#))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- wsockEvent<>
   ""
-  [^Pluglet co ^Channel ch ssl? msg]
+  [co ch msg ssl?]
   (let
-    [_body
-     (-> (cond
-           (inst? BinaryWebSocketFrame msg)
-           (-> (.content
-                 ^BinaryWebSocketFrame msg)
+    [body'
+     (-> (or (some->
+               (cast? BinaryWebSocketFrame msg)
+               (.content)
                (toByteArray))
-           (inst? TextWebSocketFrame msg)
-           (.text ^TextWebSocketFrame msg))
-         (xdata<>))
+             (some->
+               (cast? TextWebSocketFrame msg)
+               (.text)))
+         (xdata<> ))
      eeid (seqint2)]
     (with-meta
       (reify WSockMsg
-        (isBinary [_] (instBytes? (.content _body)))
-        (isText [_] (string? (.content _body)))
+        (isBinary [_] (instBytes? (.content body')))
+        (isText [_] (string? (.content body')))
         (checkAuthenticity [_] false)
         (socket [_] ch)
         (id [_] eeid)
         (isSSL [_] ssl?)
-        (body [_] _body)
+        (body [_] body')
         (source [_] co))
       {:typeid ::WSockMsg})))
 
@@ -207,38 +176,36 @@
 (defn- httpEvent<>
   ""
   ^HttpMsg
-  [^Pluglet co ^Channel ch ssl? ^WholeRequest req]
+  [^Pluglet co ^Channel ch ^WholeRequest req ssl?]
   (let
     [^InetSocketAddress laddr (.localAddress ch)
-     _body (.content req)
+     body' (.content req)
      gist (.msgGist req)
-     rgist (:route gist)
-     ^RouteInfo ri (:info rgist)
-     wantSess? (some-> ri (.wantSession))
-     wantSecure? (some-> ri (.isSecure))
+     ^RouteInfo
+     ri (get-in gist [:route :info])
      eeid (str "event#" (seqint2))
      cookieJar (:cookies gist)
-     impl (muble<> {:stale false})]
+     impl (muble<> {:stale? false})]
     (with-meta
       (reify HttpMsg
 
-        (checkAuthenticity [_] wantSecure?)
-        (checkSession [_] wantSess?)
+        (checkAuthenticity [_] (some-> ri (.isSecure)))
+        (checkSession [_] (some-> ri (.wantSession)))
+
         (session [_] (.getv impl :session))
         (id [_] eeid)
         (source [_] co)
         (socket [_] ch)
 
-        ;;:route {:redirect :status :info :groups :places }
-        (routeGist [_] rgist)
+        ;;:route {:redirect :status? :info :groups :places}
+        (routeGist [_] (:route gist))
 
         (cookie [_ n] (get cookieJar n))
         (cookies [_] (vals cookieJar))
         (msgGist [_] gist)
-        (body [_] _body)
+        (body [_] body')
 
-        (localAddr [_]
-          (.getHostAddress (.getAddress laddr)))
+        (localAddr [_] (.. laddr getAddress getHostAddress))
         (localHost [_] (.getHostName laddr))
         (localPort [_] (.getPort laddr))
 
@@ -256,22 +223,21 @@
 
         (setTrigger [_ t] (.setv impl :trigger t))
         (cancel [_]
-          (if-some [t (.getv impl :trigger)]
-            (cancelTimerTask t))
-          (.unsetv impl :trigger))
+          (some-> (.unsetv impl :trigger)
+                  (cancelTimerTask )))
 
         (fire [this _]
-          (when-some [t (.getv impl :trigger)]
-            (.setv impl :stale true)
-            (.unsetv impl :trigger)
+          (when-some [t (.unsetv impl :trigger)]
+            (.setv impl :stale? true)
             (cancelTimerTask t)
             (resumeOnExpiry ch this)))
 
         (scheme [_] (if (:ssl? gist) "https" "http"))
-        (isStale [_] (.getv impl :stale))
+        (isStale [_] (.getv impl :stale?))
         (isSSL [_] ssl?)
         (getx [_] impl))
-      {:typeid ::HTTPEvent})))
+
+      {:typeid ::HTTPMsg})))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -281,47 +247,39 @@
   (let [ssl? (maybeSSL? ch)]
     (if
       (inst? WebSocketFrame msg)
-      (wsockEvent<> co ch ssl? msg)
-      (httpEvent<> co ch ssl? msg))))
+      (wsockEvent<> co ch msg ssl?)
+      (httpEvent<> co ch msg ssl?))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- h1Handler->onRead
+(defn- boot!
   ""
-  [^ChannelHandlerContext ctx ^Pluglet co ^WholeRequest req]
-  (let [{:keys [waitMillis]}
-        (.config co)
-        ^HttpMsg
-        evt (evt<> co {:msg req
-                       :ch (.channel ctx)})]
-    (if (spos? waitMillis)
-      (.hold co evt waitMillis))
-    (dispatch! evt)))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-(defn- boot<>
-  ""
-  [^Pluggable co]
+  [^Pluglet co]
   (let
-    [cfg (.config co)
+    [{:keys [waitMillis] :as cfg}
+     (.config co)
      bs
-     (httpServer<>
-       (proxy [CPDecorator][]
-         (forH1 [_]
-           (ihandler<>
-             #(h1Handler->onRead %1 (.parent co) %2)))) cfg)
-     ch (startServer bs cfg)]
-    [bs ch]))
+     (createServer<>
+       :netty/http
+       (fn [_]
+         {:h1
+          (proxy [InboundHandler][]
+            (channelRead0 [ctx msg]
+              (let [ch (ch?? ctx)
+                    ev (evt<> co {:msg msg
+                                  :ch ch})]
+                (if (spos? waitMillis)
+                  (.hold co ev waitMillis))
+                (dispatch! ev))))}) cfg)]
+    [bs (startServer bs cfg)]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn ProcessOrphan
+(defn processOrphan
   ""
   [^Job job error]
   ;; 500 or 503
-  (let [s (or (.getv job :statusCode)
-              500)
+  (let [s (or (.getv job :statusCode) 500)
         ^HttpMsg evt (.origin job)]
     (->> (httpResult<>
            (.socket evt)
@@ -365,7 +323,7 @@
 (def
   ^:private
   httpspecdef
-  {:eror :czlab.wabbit.plugs.io.http/ProcessOrphan
+  {:eror :czlab.wabbit.plugs.io.http/processOrphan
    :info {:name "HTTP Server"
           :version "1.0.0"}
    :conf {:maxInMemory (* 1024 1024 4)
@@ -399,7 +357,7 @@
           (.copyEx impl
                    (httpBasicConfig k conf arg))))
       (start [this _]
-        (let [[bs ch] (boot<> this)]
+        (let [[bs ch] (boot! (.parent this))]
           (.setv impl :$boot bs)
           (.setv impl :$chan ch)))
       (stop [_]
@@ -430,8 +388,8 @@
 (def
   ^:private
   mvcspecdef
-  {:deps [:czlab.wabbit.plugs.auth.core/WebAuth]
-   :eror :czlab.wabbit.plugs.io.http/ProcessOrphan
+  {:eror :czlab.wabbit.plugs.io.http/processOrphan
+   :deps [:czlab.wabbit.plugs.auth.core/WebAuth]
    :info {:name "Web Site"
           :version "1.0.0"}
    :conf {:maxInMemory (* 1024 1024 4)
@@ -473,7 +431,7 @@
       (setParent [_ p] (.setv impl :$parent p))
       (parent [_] (.getv impl :$parent))
       (config [_] (dissoc (.intern impl)
-                          :$parent :$boot :$chan))
+                          :$ftlCfg :$parent :$boot :$chan))
       (spec [_] pspec)
       (init [this arg]
         (let [^Pluglet pg (.parent this)
@@ -483,10 +441,10 @@
           (.copyEx impl
                    (httpBasicConfig k conf arg))
           (.setv impl
-                 :ftlCfg
+                 :$ftlCfg
                  (ftl/genFtlConfig {:root root}))))
       (start [this _]
-        (let [[bs ch] (boot<> this)]
+        (let [[bs ch] (boot! (.parent this))]
           (.setv impl :$boot bs)
           (.setv impl :$chan ch)))
       (stop [_]

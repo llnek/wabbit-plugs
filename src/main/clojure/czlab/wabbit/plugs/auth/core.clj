@@ -13,7 +13,7 @@
 
   (:require [czlab.basal.format :refer [readEdn readJsonStr writeJsonStr]]
             [czlab.twisty.codec :refer [caesarDecrypt passwd<>]]
-            [czlab.convoy.net.util :refer [filterFormFields]]
+            [czlab.convoy.util :refer [filterFormFields]]
             [czlab.wabbit.plugs.io.http :refer [scanBasicAuth]]
             [czlab.horde.dbio.connect :refer [dbopen<+>]]
             [czlab.basal.resources :refer [rstr]]
@@ -25,7 +25,7 @@
         [czlab.wabbit.plugs.auth.core]
         [czlab.wabbit.plugs.mvc.web]
         [czlab.wabbit.base.core]
-        [czlab.convoy.net.core]
+        [czlab.convoy.core]
         [czlab.basal.core]
         [czlab.basal.io]
         [czlab.basal.meta]
@@ -33,7 +33,7 @@
         [czlab.horde.dbio.core])
 
   (:import [org.apache.shiro.authc.credential CredentialsMatcher]
-           [czlab.convoy.net HttpResult ULFormItems ULFileItem]
+           [czlab.convoy HttpResult ULFormItems ULFileItem]
            [org.apache.shiro.config IniSecurityManagerFactory]
            [org.apache.shiro.authc UsernamePasswordToken]
            [czlab.jasal XData Muble I18N BadDataError]
