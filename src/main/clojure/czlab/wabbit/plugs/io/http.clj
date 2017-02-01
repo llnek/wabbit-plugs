@@ -11,7 +11,7 @@
 
   czlab.wabbit.plugs.io.http
 
-  (:require [czlab.convoy.util :refer [parseBasicAuth]]
+  (:require [czlab.convoy.net.util :refer [parseBasicAuth]]
             [czlab.basal.io :refer [xdata<> slurpUtf8]]
             [czlab.basal.format :refer [readEdn]]
             [czlab.twisty.codec :refer [passwd<>]]
@@ -22,20 +22,20 @@
 
   (:use [czlab.wabbit.plugs.io.core]
         [czlab.wabbit.base.core]
-        [czlab.nettio.discarder]
+        [czlab.convoy.nettio.discarder]
         [czlab.flux.wflow.core]
-        ;;[czlab.nettio.server]
-        [czlab.convoy.server]
-        [czlab.convoy.routes]
-        [czlab.nettio.core]
-        [czlab.convoy.core]
+        ;;[czlab.convoy.nettio.server]
+        [czlab.convoy.net.server]
+        [czlab.convoy.net.routes]
+        [czlab.convoy.nettio.core]
+        [czlab.convoy.net.core]
         [czlab.twisty.ssl]
         [czlab.basal.core]
         [czlab.basal.str]
         [czlab.basal.meta])
 
-  (:import [czlab.convoy HttpResult RouteCracker RouteInfo]
-           [czlab.nettio WholeRequest InboundHandler]
+  (:import [czlab.convoy.net HttpResult RouteCracker RouteInfo]
+           [czlab.convoy.nettio WholeRequest InboundHandler]
            [java.nio.channels ClosedChannelException]
            [io.netty.handler.codec.http.websocketx
             TextWebSocketFrame

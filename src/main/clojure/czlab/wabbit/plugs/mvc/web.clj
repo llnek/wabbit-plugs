@@ -18,7 +18,7 @@
             [clojure.string :as cs])
 
   (:use [czlab.wabbit.base.core]
-        [czlab.convoy.core]
+        [czlab.convoy.net.core]
         [czlab.wabbit.plugs.io.http]
         [czlab.basal.consts]
         [czlab.basal.core]
@@ -32,7 +32,7 @@
            [czlab.wabbit.plugs.io HttpMsg]
            [czlab.flux.wflow WorkStream Job]
            [java.net HttpCookie]
-           [czlab.convoy
+           [czlab.convoy.net
             WebContent
             HttpResult
             RouteInfo

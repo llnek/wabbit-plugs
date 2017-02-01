@@ -15,8 +15,8 @@
   (:use [czlab.test.wabbit.plugs.mock]
         [czlab.wabbit.plugs.io.core]
         [czlab.wabbit.ctl.core]
-        [czlab.nettio.client]
-        [czlab.convoy.core]
+        [czlab.convoy.nettio.client]
+        [czlab.convoy.net.core]
         [czlab.wabbit.base.core]
         [czlab.flux.wflow.core]
         [czlab.basal.core]
@@ -28,7 +28,7 @@
            [javax.mail Message Message$RecipientType Multipart]
            [javax.mail.internet MimeMessage]
            [javax.jms TextMessage]
-           [czlab.nettio WholeResponse]
+           [czlab.convoy.nettio WholeResponse]
            [czlab.flux.wflow WorkStream Job]
            [io.netty.channel Channel]
            [czlab.wabbit.sys Execvisor]
@@ -117,7 +117,7 @@
 (defn httpHandler
   ""
   []
-  (require 'czlab.nettio.resp)
+  (require 'czlab.convoy.nettio.resp)
   #(let [^HttpMsg ev (.origin ^Job %)
          soc (.socket ev)
          res (httpResult<> soc (.msgGist ev))]
