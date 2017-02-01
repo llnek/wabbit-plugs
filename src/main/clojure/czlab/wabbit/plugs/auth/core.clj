@@ -32,8 +32,8 @@
         [czlab.basal.str]
         [czlab.horde.dbio.core])
 
-  (:import [org.apache.shiro.authc.credential CredentialsMatcher]
-           [czlab.convoy.net HttpResult ULFormItems ULFileItem]
+  (:import [czlab.convoy.net AuthError HttpResult ULFormItems ULFileItem]
+           [org.apache.shiro.authc.credential CredentialsMatcher]
            [org.apache.shiro.config IniSecurityManagerFactory]
            [org.apache.shiro.authc UsernamePasswordToken]
            [czlab.jasal XData Muble I18N BadDataError]
@@ -64,7 +64,6 @@
             Script]
            [czlab.wabbit.plugs.auth
             AuthPluglet
-            AuthError
             UnknownUser
             DuplicateUser]
            [czlab.wabbit.ctl Pluggable PlugError]

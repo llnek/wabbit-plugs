@@ -17,7 +17,7 @@ import java.io.OutputStream;
 /**
  * @author Kenneth Leung
  */
-public interface SocketMsg extends PlugMsg {
+public interface TcpMsg extends PlugMsg {
 
   /**/
   public OutputStream sockOut();

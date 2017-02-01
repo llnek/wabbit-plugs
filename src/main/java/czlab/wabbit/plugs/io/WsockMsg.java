@@ -16,7 +16,7 @@ import czlab.jasal.XData;
 /**
  * @author Kenneth Leung
  */
-public interface WSockMsg extends PlugMsg {
+public interface WsockMsg extends PlugMsg {
 
   /**/
   public boolean isBinary();

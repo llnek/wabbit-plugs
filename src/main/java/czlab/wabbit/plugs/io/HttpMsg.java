@@ -10,14 +10,14 @@
 
 package czlab.wabbit.plugs.io;
 
+import czlab.convoy.net.HttpRequest;
 import czlab.wabbit.ctl.PlugMsg;
-import czlab.convoy.net.HttpInvoke;
 import czlab.jasal.Triggerable;
 
 /**
  * @author Kenneth Leung
  */
-public interface HttpMsg extends PlugMsg, Triggerable, HttpInvoke {
+public interface HttpMsg extends PlugMsg, Triggerable, HttpRequest {
 
 
 }

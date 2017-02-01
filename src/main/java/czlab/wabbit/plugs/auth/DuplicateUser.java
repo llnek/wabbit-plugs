@@ -10,11 +10,12 @@
 
 package czlab.wabbit.plugs.auth;
 
+import czlab.wabbit.ctl.PlugError;
 
 /**
  * @author Kenneth Leung
  */
-public class DuplicateUser extends AuthError {
+public class DuplicateUser extends PlugError {
 
   private static final long serialVersionUID = 1L;
 

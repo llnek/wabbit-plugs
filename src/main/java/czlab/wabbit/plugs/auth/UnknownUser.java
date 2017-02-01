@@ -10,10 +10,13 @@
 
 package czlab.wabbit.plugs.auth;
 
+import  czlab.wabbit.ctl.PlugError;
+
+
 /**
  * @author Kenneth Leung
  */
-public class UnknownUser extends AuthError {
+public class UnknownUser extends PlugError {
 
   private static final long serialVersionUID = 1L;
 

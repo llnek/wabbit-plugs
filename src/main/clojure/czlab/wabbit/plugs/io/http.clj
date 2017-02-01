@@ -43,7 +43,7 @@
             BinaryWebSocketFrame]
            [czlab.wabbit.ctl Pluggable Pluglet PlugMsg]
            [io.netty.handler.codec DecoderException]
-           [czlab.wabbit.plugs.io HttpMsg WSockMsg]
+           [czlab.wabbit.plugs.io HttpMsg WsockMsg]
            [io.netty.handler.codec.http.cookie
             ServerCookieDecoder
             ServerCookieEncoder]
@@ -160,7 +160,7 @@
          (xdata<> ))
      eeid (seqint2)]
     (with-meta
-      (reify WSockMsg
+      (reify WsockMsg
         (isBinary [_] (instBytes? (.content body')))
         (isText [_] (string? (.content body')))
         (checkAuthenticity [_] false)
@@ -169,7 +169,7 @@
         (isSSL [_] ssl?)
         (body [_] body')
         (source [_] co))
-      {:typeid ::WSockMsg})))
+      {:typeid ::WsockMsg})))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

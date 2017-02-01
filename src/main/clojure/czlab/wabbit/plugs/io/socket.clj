@@ -24,7 +24,7 @@
   (:import [java.net InetAddress ServerSocket Socket]
            [czlab.wabbit.ctl Pluglet Pluggable]
            [clojure.lang APersistentMap]
-           [czlab.wabbit.plugs.io SocketMsg]))
+           [czlab.wabbit.plugs.io TcpMsg]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;(set! *warn-on-reflection* true)
@@ -37,14 +37,14 @@
 
   (let [eeid (str "event#" (seqint2))]
     (with-meta
-      (reify SocketMsg
+      (reify TcpMsg
         (checkAuthenticity [_] false)
         (id [_] eeid)
         (sockOut [_] (.getOutputStream socket))
         (sockIn [_] (.getInputStream socket))
         (source [_] co)
         (dispose [_] (closeQ socket)))
-      {:typeid ::SocketMsg})))
+      {:typeid ::TcpMsg})))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
