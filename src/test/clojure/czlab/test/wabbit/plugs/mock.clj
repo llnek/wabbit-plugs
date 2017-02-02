@@ -45,9 +45,9 @@
       (reify
         Execvisor
 
+        (homeDir [_] (io/file (sysProp "wabbit.user.dir")))
         (pkeyBytes [this] (bytesify (.pkey this)))
         (pkey [_] "hello world")
-        (homeDir [_] (getCwd))
         (cljrt [_] rts)
 
         (getx [_] impl)

@@ -182,6 +182,7 @@
     [^InetSocketAddress laddr (.localAddress ch)
      body' (.content req)
      gist (.msgGist req)
+     _ (log/debug "%s" gist)
      ^RouteInfo
      ri (get-in gist [:route :info])
      eeid (str "event#" (seqint2))
@@ -251,7 +252,7 @@
 (defn- evt<>
   ""
   [co {:keys [ch msg]}]
-  (let [ssl? (maybeSSL? ch)]
+  (let []
     (if
       (inst? WebSocketFrame msg)
       (wsockEvent<> co ch msg)

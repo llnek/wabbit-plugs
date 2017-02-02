@@ -16,7 +16,8 @@
             [clojure.string :as cs]
             [clojure.java.io :as io])
 
-  (:use [czlab.wabbit.base.core]
+  (:use [czlab.convoy.nettio.resp]
+        [czlab.wabbit.base.core]
         [czlab.convoy.net.core]
         [czlab.convoy.net.wess]
         [czlab.basal.consts]

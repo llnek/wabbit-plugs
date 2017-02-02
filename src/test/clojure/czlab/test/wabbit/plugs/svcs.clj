@@ -129,6 +129,33 @@
 ;;
 (deftest czlabtestwabbitplugs-svcs
 
+  (is (do->true (sysProp! "wabbit.user.dir" "/private/tmp")))
+
+  (is (let [etype :czlab.wabbit.plugs.io.http/WebMVC
+            ctr (mocker :exec)
+            s (plugletViaType<> ctr etype "t")]
+        (.init s
+               {:handler "czlab.test.wabbit.plugs.svcs/httpHandler"
+                :host "localhost"
+                :port 8888})
+        (.start s nil)
+        (pause 1000)
+        (let [f (io/file "/private/tmp/public/test.js")
+              _ (.mkdirs (.getParentFile f))
+              _ (spit f "hello")
+              res (h1get "http://localhost:8888/public/test.js")
+              ^WholeResponse
+              rc (deref res 2000 nil)
+              _ (println "rc =====" rc)
+              z (some-> rc
+                        (.content ) (.stringify))]
+          (.stop s)
+          (.dispose s)
+          (.dispose ctr)
+          (= "hello" z))))
+
+  (pause 30000)
+
   (is (let [_ (sysProp! "wabbit.mock.mail.proto" "imaps")
             etype :czlab.wabbit.plugs.io.mails/IMAP
             ctr (mocker :exec)
