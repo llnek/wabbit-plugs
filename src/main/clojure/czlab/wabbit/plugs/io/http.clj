@@ -16,19 +16,19 @@
             [czlab.basal.format :refer [readEdn]]
             [czlab.twisty.codec :refer [passwd<>]]
             [czlab.basal.logging :as log]
-            [czlab.wabbit.plugs.mvc.ftl :as ftl]
+            [czlab.wabbit.plugs.io.mvc :as mvc]
             [clojure.java.io :as io]
             [clojure.string :as cs])
 
-  (:use [czlab.wabbit.plugs.io.core]
+  (:use [czlab.convoy.nettio.discarder]
+        [czlab.convoy.nettio.core]
+        [czlab.wabbit.plugs.io.core]
         [czlab.wabbit.base.core]
-        [czlab.convoy.nettio.discarder]
-        [czlab.flux.wflow.core]
-        ;;[czlab.convoy.nettio.server]
+        [czlab.convoy.net.core]
+        [czlab.convoy.net.wess]
         [czlab.convoy.net.server]
         [czlab.convoy.net.routes]
-        [czlab.convoy.nettio.core]
-        [czlab.convoy.net.core]
+        [czlab.flux.wflow.core]
         [czlab.twisty.ssl]
         [czlab.basal.core]
         [czlab.basal.str]
@@ -147,7 +147,7 @@
 ;;
 (defn- wsockEvent<>
   ""
-  [co ch msg ssl?]
+  [co ch msg]
   (let
     [body'
      (-> (or (some->
@@ -158,6 +158,7 @@
                (cast? TextWebSocketFrame msg)
                (.text)))
          (xdata<> ))
+     ssl? (maybeSSL? ch)
      eeid (seqint2)]
     (with-meta
       (reify WsockMsg
@@ -176,7 +177,7 @@
 (defn- httpEvent<>
   ""
   ^HttpMsg
-  [^Pluglet co ^Channel ch ^WholeRequest req ssl?]
+  [^Pluglet co ^Channel ch ^WholeRequest req]
   (let
     [^InetSocketAddress laddr (.localAddress ch)
      body' (.content req)
@@ -185,14 +186,20 @@
      ri (get-in gist [:route :info])
      eeid (str "event#" (seqint2))
      cookieJar (:cookies gist)
-     impl (muble<> {:stale? false})]
+     wss
+     (upstream ri
+               cookieJar
+               (:ssl? gist)
+               (.. co server pkeyBytes)
+               (:maxIdleSecs (.config co)))
+     impl (muble<> {:$session wss :$stale? false})]
     (with-meta
       (reify HttpMsg
 
         (checkAuthenticity [_] (some-> ri (.isSecure)))
         (checkSession [_] (some-> ri (.wantSession)))
 
-        (session [_] (.getv impl :session))
+        (session [_] (.getv impl :$session))
         (id [_] eeid)
         (source [_] co)
         (socket [_] ch)
@@ -221,20 +228,20 @@
         (serverName [_]
           (str (gistHeader gist "server_name")))
 
-        (setTrigger [_ t] (.setv impl :trigger t))
+        (setTrigger [_ t] (.setv impl :$trigger t))
         (cancel [_]
-          (some-> (.unsetv impl :trigger)
+          (some-> (.unsetv impl :$trigger)
                   (cancelTimerTask )))
 
         (fire [this _]
-          (when-some [t (.unsetv impl :trigger)]
-            (.setv impl :stale? true)
+          (when-some [t (.unsetv impl :$trigger)]
+            (.setv impl :$stale? true)
             (cancelTimerTask t)
             (resumeOnExpiry ch this)))
 
         (scheme [_] (if (:ssl? gist) "https" "http"))
-        (isStale [_] (.getv impl :stale?))
-        (isSSL [_] ssl?)
+        (isStale [_] (.getv impl :$stale?))
+        (isSSL [_] (:ssl? gist))
         (getx [_] impl))
 
       {:typeid ::HTTPMsg})))
@@ -247,8 +254,8 @@
   (let [ssl? (maybeSSL? ch)]
     (if
       (inst? WebSocketFrame msg)
-      (wsockEvent<> co ch msg ssl?)
-      (httpEvent<> co ch msg ssl?))))
+      (wsockEvent<> co ch msg)
+      (httpEvent<> co ch msg))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -265,12 +272,19 @@
          {:h1
           (proxy [InboundHandler][]
             (channelRead0 [ctx msg]
-              (let [ch (ch?? ctx)
-                    ev (evt<> co {:msg msg
-                                  :ch ch})]
+              (let
+                [ev (evt<> co {:msg msg
+                               :ch (ch?? ctx)})
+                 ^RouteInfo
+                 ri (some-> (cast? HttpMsg ev)
+                            (.routeGist) (:info))
+                 s? (some-> ri (.isStatic))
+                 hd (some-> ri (.handler))
+                 hd (if (and s? (nichts? hd))
+                      "czlab.wabbit.plugs.io.mvc/asset!" hd)]
                 (if (spos? waitMillis)
                   (.hold co ev waitMillis))
-                (dispatch! ev))))}) cfg)]
+                (dispatch! ev {:handler hd}))))}) cfg)]
     [bs (startServer bs cfg)]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -374,7 +388,7 @@
   [cfg tpath data]
   (let
     [ts (str "/" (triml tpath "/"))
-     out (ftl/renderFtl cfg ts data)]
+     out (mvc/renderFtl cfg ts data)]
     {:data (xdata<> out)
      :ctype
      (cond
@@ -442,7 +456,7 @@
                    (httpBasicConfig k conf arg))
           (.setv impl
                  :$ftlCfg
-                 (ftl/genFtlConfig {:root root}))))
+                 (mvc/genFtlConfig {:root root}))))
       (start [this _]
         (let [[bs ch] (boot! (.parent this))]
           (.setv impl :$boot bs)

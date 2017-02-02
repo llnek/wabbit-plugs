@@ -23,7 +23,6 @@
 
   (:use [czlab.wabbit.plugs.auth.model]
         [czlab.wabbit.plugs.auth.core]
-        [czlab.wabbit.plugs.mvc.web]
         [czlab.wabbit.base.core]
         [czlab.convoy.net.core]
         [czlab.basal.core]

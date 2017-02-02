@@ -34,7 +34,7 @@
            [czlab.wabbit.sys Execvisor]
            [czlab.wabbit.plugs.io
             MailMsg
-            SocketMsg
+            TcpMsg
             FileMsg
             JmsMsg
             HttpMsg]
@@ -81,7 +81,7 @@
   ""
   []
   #(let
-     [^SocketMsg ev (.origin ^Job %)
+     [^TcpMsg ev (.origin ^Job %)
       dis (DataInputStream. (.sockIn ev))
       dos (DataOutputStream. (.sockOut ev))
       nm (.readInt dis)]
@@ -123,7 +123,7 @@
          res (httpResult<> soc (.msgGist ev))]
      (.setContentType res "text/plain")
      (.setContent res "hello")
-     (replyResult soc res)))
+     (replyResult res)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

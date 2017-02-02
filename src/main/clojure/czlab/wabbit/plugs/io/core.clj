@@ -69,7 +69,7 @@
      [src (.source evt)
       cfg (.config src)
       c0 (strKW (:handler cfg))
-      c1 (strKW (:router arg))
+      c1 (strKW (:handler arg))
       ctr (.server src)
       rts (.cljrt ctr)
       cb (stror c1 c0)
@@ -77,13 +77,12 @@
       wf (or
            (try! (.call rts cb))
            (error! src job nil))]
-     (log/debug (str "event type = %s\n"
-                     "event arg = %s\n"
-                     "event cb = %s")
-                (gtid src) arg c1 c0)
+     (log/debug
+       (str "type = %s\n"
+            "arg = %s\n"
+            "cb = %s") (gtid src) arg c1 c0)
      (try
        (log/debug "job#%s => %s" (.id job) (.id src))
-       (.setv job evt-opts arg)
        (do->nil
          (cond
            (inst? WorkStream wf)

@@ -6,17 +6,24 @@
 ;; the terms of this license.
 ;; You must not remove this notice, or any other, from this software.
 
-(ns ^{:doc "Helpers related to Freemarker."
+(ns ^{:doc ""
       :author "Kenneth Leung"}
 
-  czlab.wabbit.plugs.mvc.ftl
+  czlab.wabbit.plugs.io.mvc
 
   (:require [clojure.walk :as cw :refer [postwalk]]
             [czlab.basal.logging :as log]
+            [clojure.string :as cs]
             [clojure.java.io :as io])
 
-  (:use [czlab.basal.core]
-        [czlab.basal.str])
+  (:use [czlab.wabbit.base.core]
+        [czlab.convoy.net.core]
+        [czlab.convoy.net.wess]
+        [czlab.basal.consts]
+        [czlab.basal.core]
+        [czlab.basal.str]
+        [czlab.flux.wflow.core]
+        [czlab.wabbit.plugs.io.core])
 
   (:import [freemarker.template
             TemplateMethodModelEx
@@ -30,6 +37,18 @@
             TemplateMethodModel
             Configuration
             DefaultObjectWrapper]
+           [czlab.wabbit.ctl Pluglet PlugMsg]
+           [czlab.wabbit.plugs.io HttpMsg]
+           [czlab.flux.wflow WorkStream Job]
+           [java.net HttpCookie]
+           [czlab.convoy.net
+            WebContent
+            HttpResult
+            AuthError
+            RouteInfo
+            HttpSession
+            RouteCracker]
+           [java.util Date]
            [java.io File Writer StringWriter]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -164,6 +183,95 @@
                  model)
                out))
    (str out)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+(defn- maybeStripUrlCrap
+  "Want to handle case where the url has stuff after the file name.
+   For example:  /public/blab&hhh or /public/blah?ggg"
+  ^String
+  [^String path]
+
+  (let [pos (.lastIndexOf path (int \/))]
+    (if (spos? pos)
+      (let [p1 (.indexOf path (int \?) pos)
+            p2 (.indexOf path (int \&) pos)
+            p3 (cond
+                 (and (> p1 0)
+                      (> p2 0))
+                 (Math/min p1 p2)
+                 (> p1 0) p1
+                 (> p2 0) p2
+                 :else -1)]
+        (if (> p3 0)
+          (.substring path 0 p3)
+          path))
+      path)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+(defn- getStatic
+  ""
+  [^HttpMsg evt file]
+  (let
+    [^Channel ch (.socket evt)
+     gist (.msgGist evt)
+     res (httpResult<> ch gist)
+     fp (io/file file)]
+    (log/debug "serving file: %s" (fpath fp))
+    (try
+      (if (or (nil? fp)
+              (not (.exists fp)))
+        (do
+          (.setStatus res 404)
+          (replyResult res))
+        (do
+          (.setContent res fp)
+          (replyResult res)))
+      (catch Throwable e#
+        (log/error "get: %s" (:uri gist) e#)
+        (try!
+          (.setStatus res 500)
+          (.setContent res nil)
+          (replyResult res))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+(def ^:private asset-handler
+  (workStream<>
+    (script<>
+      #(let
+         [^HttpMsg evt (.origin ^Job %2)
+          cfg (.. evt source config)
+          homeDir (.. evt
+                      source
+                      server homeDir)
+          r (.routeGist evt)
+          mp (some-> ^RouteInfo
+                     (:info r) (.mountPoint))
+          fp (str
+               (reduce
+                 (fn [a b] (cs/replace-first a "{}" b))
+                 (cs/replace (str mp)
+                             "${pod.dir}" (fpath homeDir))
+                 (:groups r)))
+          pubDir (io/file homeDir dn-pub)
+          check? (:fileAccessCheck? cfg)
+          gist (.msgGist evt)]
+         (log/debug "request for asset: %s" fp)
+         (if (or (false? check?)
+                 (.startsWith fp
+                              (fpath pubDir)))
+           (->> (maybeStripUrlCrap fp)
+                (getStatic evt))
+           (let [ch (.socket evt)]
+             (log/warn "illegal access: %s" fpath)
+             (-> (httpResult<> ch gist 403)
+                 (replyResult ))))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+(defn asset! "" ^WorkStream [] asset-handler)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF
