@@ -182,25 +182,25 @@
     [^InetSocketAddress laddr (.localAddress ch)
      body' (.content req)
      gist (.msgGist req)
-     _ (log/debug "%s" gist)
+     {:keys [isSecure? wantSession?]}
+     (.config co)
      ^RouteInfo
      ri (get-in gist [:route :info])
      eeid (str "event#" (seqint2))
      cookieJar (:cookies gist)
-     wss
-     (upstream ri
-               cookieJar
-               (:ssl? gist)
-               (.. co server pkeyBytes)
-               (:maxIdleSecs (.config co)))
+     ws? (and (!false? wantSession?)
+              (some-> ri .wantSession))
+     se? (and (!false? isSecure?)
+              (some-> ri .isSecure))
+     pkey (.. co server pkeyBytes)
+     wss (if ws? (upstream pkey cookieJar se?))
      impl (muble<> {:$session wss :$stale? false})]
     (with-meta
       (reify HttpMsg
 
-        (checkAuthenticity [_] (some-> ri (.isSecure)))
-        (checkSession [_] (some-> ri (.wantSession)))
-
         (session [_] (.getv impl :$session))
+        (checkAuthenticity [_] se?)
+        (checkSession [_] ws?)
         (id [_] eeid)
         (source [_] co)
         (socket [_] ch)
@@ -214,8 +214,8 @@
         (body [_] body')
 
         (localAddr [_] (.. laddr getAddress getHostAddress))
-        (localHost [_] (.getHostName laddr))
-        (localPort [_] (.getPort laddr))
+        (localHost [_] (. laddr getHostName))
+        (localPort [_] (. laddr getPort))
 
         (remotePort [_]
           (convLong (gistHeader gist "remote_port") 0))
