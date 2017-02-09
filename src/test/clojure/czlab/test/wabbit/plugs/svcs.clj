@@ -47,18 +47,12 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn testHandler
-  ""
-  []
-  #(do->nil
-     %
-     (swap! result-var + 8)))
+(defn testHandler "" [] #(do->nil % (swap! result-var + 8)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn fileHandler
-  ""
-  []
+(defn fileHandler "" []
+
   #(let [^FileMsg e (.origin ^Job %)
          {:keys [targetFolder recvFolder]}
          (.. e source config)
@@ -77,9 +71,8 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn sockHandler
-  ""
-  []
+(defn sockHandler "" []
+
   #(let
      [^TcpMsg ev (.origin ^Job %)
       dis (DataInputStream. (.sockIn ev))
@@ -91,9 +84,8 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn jmsHandler
-  ""
-  []
+(defn jmsHandler "" []
+
   #(let [^JmsMsg ev (.origin ^Job %)
          ^TextMessage msg (.message ev)
          s (.getText msg)]
@@ -102,9 +94,8 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn mailHandler
-  ""
-  []
+(defn mailHandler "" []
+
   #(let [^MailMsg ev (.origin ^Job %)
          ^MimeMessage msg (.message ev)
          _ (assert (some? msg))
@@ -114,9 +105,8 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn httpHandler
-  ""
-  []
+(defn httpHandler "" []
+
   (require 'czlab.convoy.nettio.resp)
   #(let [^HttpMsg ev (.origin ^Job %)
          soc (.socket ev)
@@ -129,10 +119,11 @@
 ;;
 (deftest czlabtestwabbitplugs-svcs
 
-  (is (do->true (sysProp! "wabbit.user.dir" "/private/tmp")))
+  (is (do->true (sysProp! "wabbit.user.dir" (fpath *tempfile-repo*))))
 
   (is (let [etype :czlab.wabbit.plugs.io.http/WebMVC
             ctr (mocker :exec)
+            dir (sysProp "wabbit.user.dir")
             s (plugletViaType<> ctr etype "t")]
         (.init s
                {:handler "czlab.test.wabbit.plugs.svcs/httpHandler"
@@ -140,14 +131,14 @@
                 :port 8888})
         (.start s nil)
         (pause 1000)
-        (let [f (io/file "/private/tmp/public/test.js")
+        (let [f (io/file dir "public/test.js")
               _ (.mkdirs (.getParentFile f))
               _ (spit f "hello")
               res (h1get "http://localhost:8888/public/test.js")
               ^WholeResponse
               rc (deref res 2000 nil)
               z (some-> rc
-                        (.content ) (.stringify))]
+                        .content .stringify)]
           (.stop s)
           (.dispose s)
           (.dispose ctr)
@@ -202,7 +193,7 @@
               ^WholeResponse
               rc (deref res 2000 nil)
               z (some-> rc
-                        (.content ) (.stringify))]
+                        .content .stringify)]
           (.stop s)
           (.dispose s)
           (.dispose ctr)
@@ -341,5 +332,4 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF
-
 

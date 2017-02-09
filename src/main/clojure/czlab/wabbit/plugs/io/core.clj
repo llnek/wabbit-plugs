@@ -30,12 +30,11 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- processOrphan
-  ""
+(defn- processOrphan ""
   ([job] (processOrphan job nil))
   ([^Job job ^Throwable e]
    (let [evt (.origin job)]
-     (some-> e (log/exception ))
+     (some-> e log/exception )
      (log/error (str "event [%s] "
                      "job#%s dropped") (gtid evt) (.id job)))))
 
@@ -50,8 +49,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- error!
-  ""
-  [^Pluglet co job e]
+  "" [^Pluglet co job e]
   (if-some+
     [r (strKW (:eror (.spec co)))]
     (.callEx (.. co server cljrt)
@@ -60,11 +58,10 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn dispatch!
-  ""
+(defn dispatch! ""
   ([evt] (dispatch! evt nil))
   ([^PlugMsg evt arg]
-   (log/debug "[%s] event is disp!" (.id (.source evt)))
+   (log/debug "[%s] event is disp!" (.. evt source id))
    (let
      [src (.source evt)
       cfg (.config src)

@@ -70,9 +70,8 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- mkBPropInfo
-  ""
-  [^String prop ^String descn ^Method getr ^Method setr]
+(defn- mkBPropInfo "" [^String prop ^String descn
+                       ^Method getr ^Method setr]
   (let
     [impl (muble<> {:getr getr
                     :setr setr
@@ -82,7 +81,7 @@
         (if-some [g (get-getter this)]
           (.getReturnType g)
           (let [ps (some-> (get-setter this)
-                           (.getParameterTypes))]
+                           .getParameterTypes)]
             (if (== 1 (count ps)) (first ps)))))
       (set-setter [_ m] (.setv impl :setr m))
       (set-getter [_ m] (.setv impl :getr m))
@@ -100,30 +99,26 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- throwUnknownError
-  ""
-  [attr]
+  "" [attr]
   (trap! AttributeNotFoundException
          (format "Unknown property %s" attr)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- throwBeanError
-  ""
-  [^String msg]
+  "" [^String msg]
   (trap! MBeanException (exp! Exception msg)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- assertArgs
-  ""
-  [mtd ptypes n]
+  "" [mtd ptypes n]
   (if (not= n (count ptypes))
     (throwBadArg (str "\"" mtd "\" needs " n "args"))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- maybeGetPropName
-  ""
+(defn- maybeGetPropName ""
   ^String
   [^String mn]
   (let
@@ -139,8 +134,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- mkParameterInfo
-  ""
+(defn- mkParameterInfo ""
   [^Method mtd]
   (preduce<vec>
     #(let [[^Class t n] %2]
@@ -158,9 +152,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- testJmxType
-  "ok if primitive types"
-  ^Class
-  [^Class cz]
+  "if primitive types"
+  ^Class [cz]
   (if (or (isBoolean? cz)
           (isVoid? cz)
           (isObject? cz)
@@ -184,13 +177,12 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- beanAttrInfo<>
-  ""
+(defn- beanAttrInfo<> ""
   ^MBeanAttributeInfo
   [v]
   (MBeanAttributeInfo. (get-name v)
                        (-> (get-type v)
-                           (.getName ))
+                           .getName)
                        (get-desc v)
                        (some? (get-getter v))
                        (some? (get-setter v))
@@ -198,8 +190,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- beanFieldInfo<>
-  ""
+(defn- beanFieldInfo<> ""
   [^Field f]
   (let [fnm (.getName f)
         t (.getType f)]
@@ -213,8 +204,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- beanOpInfo<>
-  ""
+(defn- beanOpInfo<> ""
   [^Method m]
   (let [t (.getReturnType m)
         mn (.getName m)]
@@ -262,13 +252,11 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- handleProps
-  ""
-  [^Class cz]
+(defn- handleProps "" [cz]
   (let
     [props
      (preduce<map>
-       #(handleProps2 %2 %1) (.getMethods cz))
+       #(handleProps2 %2 %1) (. ^Class cz getMethods))
      ba
      (preduce<vec>
        #(let [[k v] %2]
@@ -281,11 +269,9 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- handleFlds
-  ""
-  [^Class cz]
+(defn- handleFlds "" [cz]
   (let
-    [dcls (.getDeclaredFields cz)
+    [dcls (. ^Class cz getDeclaredFields)
      flds
      (preduce<map>
        #(let [^Field f %2
@@ -307,8 +293,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- handleMethods2
-  ""
-  [^Method m mtds rc]
+  "" [^Method m mtds rc]
   (let
     [ptypes (.getParameterTypes m)
      rtype (.getReturnType m)
@@ -326,31 +311,27 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- handleMethods
-  ""
-  [^Class cz]
+(defn- handleMethods "" [cz]
   (log/info "jmx-bean: processing methods for class: %s" cz)
   (loop
-    [ms (.getMethods cz)
+    [ms (. ^Class cz getMethods)
      mtds (transient {})
      rc (transient [])]
     (if (empty? ms)
       [(pcoll! rc) (pcoll! mtds)]
       (let [[m r]
             (handleMethods2 (first ms) mtds rc)]
-        (recur (rest ms)
-               m
-               r)))))
+        (recur (rest ms) m r)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn jmxBean<>
   "Make a JMX bean from this object"
   ^DynamicMBean
-  [^Object obj]
+  [obj]
   {:pre [(some? obj)]}
   (let
-    [cz (.getClass obj)
+    [cz (. ^Object obj getClass)
      [ps propsMap] (handleProps cz)
      [fs fldsMap] (handleFlds cz)
      [ms mtdsMap] (handleMethods cz)
@@ -448,5 +429,4 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF
-
 

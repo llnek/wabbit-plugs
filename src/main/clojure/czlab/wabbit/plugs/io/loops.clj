@@ -34,6 +34,7 @@
 (defn- configRepeat
   ""
   [^Timer timer delays ^long intv func]
+
   (log/info "Scheduling a *repeating* timer: %dms" intv)
   (let
     [tt (tmtask<> func)
@@ -52,6 +53,7 @@
 (defn- configOnce
   ""
   [^Timer timer delays func]
+
   (log/info "Scheduling a *one-shot* timer at %s" delays)
   (let
     [tt (tmtask<> func)
@@ -70,6 +72,7 @@
   [timer wakeup {:keys [intervalSecs
                         delayWhen
                         delaySecs] :as cfg} repeat?]
+
   (let
     [d [delayWhen (s2ms delaySecs)]]
     (test-some "java-timer" timer)
@@ -82,9 +85,8 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn threadedTimer
-  ""
-  [funcs]
+(defn threadedTimer "" [funcs]
+
   (let
     [wake (or (:$wakeup funcs)
               (constantly nil))
@@ -115,11 +117,9 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- evt<>
-  ^TimerMsg
-  [co repeat?]
-  (let [eeid (str "event#"
-                  (seqint2))]
+(defn- evt<> ^TimerMsg [co repeat?]
+
+  (let [eeid (str "event#" (seqint2))]
     (with-meta
       (reify
         TimerMsg
@@ -155,14 +155,14 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- xxxTimer<>
-  ""
-  [{:keys [conf] :as tspec} repeat?]
+  "" [{:keys [conf] :as tspec} repeat?]
+
   (let
     [impl (muble<>)
      stop #(try!
              (some-> ^Timer
                      (.unsetv impl :$timer)
-                     (.cancel)))]
+                     .cancel))]
     (reify
       Pluggable
       (setParent [_ p] (.setv impl :$parent p))
@@ -189,9 +189,8 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn RepeatingTimer
-  ""
-  ^Pluggable
+(defn RepeatingTimer "" ^Pluggable
+
   ([_] (RepeatingTimer _ (RepeatingTimerSpec)))
   ([_ spec] (xxxTimer<> spec true)))
 
@@ -201,13 +200,11 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn OnceTimer
-  ""
-  ^Pluggable
+(defn OnceTimer "" ^Pluggable
+
   ([_] (OnceTimer _ (OnceTimerSpec)))
   ([_ spec] (xxxTimer<> spec false)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF
-
 

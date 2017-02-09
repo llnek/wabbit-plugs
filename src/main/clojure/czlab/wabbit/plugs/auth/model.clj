@@ -34,7 +34,9 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(def ^:dynamic *auth-meta-cache*
+(def
+  ^:dynamic
+  *auth-meta-cache*
   (dbschema<>
     (dbmodel<> ::StdAddress
       (dbfields
@@ -72,15 +74,15 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn genAuthPlugletDDL
+
   "Generate db ddl for the auth-plugin"
   ^String
   [spec]
   {:pre [(keyword? spec)]}
+
   (if (contains? *db-types* spec)
     (getDDL *auth-meta-cache* spec)
-    (dberr! (rstr (I18N/base)
-                  "db.unknown"
-                  (name spec)))))
+    (dberr! (rstr (I18N/base) "db.unknown" (name spec)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

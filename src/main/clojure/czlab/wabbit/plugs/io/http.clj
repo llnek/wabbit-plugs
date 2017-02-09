@@ -116,22 +116,19 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- maybeLoadRoutes
-  ""
-  [{:keys [routes]}]
+  "" [{:keys [routes]}]
   (when-not (empty? routes) (loadRoutes routes)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- maybeClose
-  ""
-  [^HttpMsg evt ^ChannelFuture cf]
+  "" [^HttpMsg evt ^ChannelFuture cf]
   (closeCF cf (:isKeepAlive? (.msgGist evt))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- resumeOnExpiry
-  ""
-  [^Channel ch ^HttpMsg evt]
+  "" [^Channel ch ^HttpMsg evt]
   (try
     (->> (httpResult<>
            (.socket evt)
@@ -145,19 +142,16 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- wsockEvent<>
-  ""
-  [co ch msg]
+(defn- wsockEvent<> "" [co ch msg]
   (let
     [body'
      (-> (or (some->
                (cast? BinaryWebSocketFrame msg)
-               (.content)
-               (toByteArray))
+               .content
+               toByteArray)
              (some->
-               (cast? TextWebSocketFrame msg)
-               (.text)))
-         (xdata<> ))
+               (cast? TextWebSocketFrame msg) .text))
+         xdata<> )
      ssl? (maybeSSL? ch)
      eeid (seqint2)]
     (with-meta
@@ -175,9 +169,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- httpEvent<>
-  ""
-  ^HttpMsg
-  [^Pluglet co ^Channel ch ^WholeRequest req]
+  "" ^HttpMsg [^Pluglet co
+               ^Channel ch ^WholeRequest req]
   (let
     [^InetSocketAddress laddr (.localAddress ch)
      body' (.content req)
@@ -232,7 +225,7 @@
         (setTrigger [_ t] (.setv impl :$trigger t))
         (cancel [_]
           (some-> (.unsetv impl :$trigger)
-                  (cancelTimerTask )))
+                  cancelTimerTask ))
 
         (fire [this _]
           (when-some [t (.unsetv impl :$trigger)]
@@ -250,19 +243,16 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- evt<>
-  ""
-  [co {:keys [ch msg]}]
-  (let []
-    (if
-      (inst? WebSocketFrame msg)
-      (wsockEvent<> co ch msg)
-      (httpEvent<> co ch msg))))
+  "" [co {:keys [ch msg]}]
+  (if
+    (inst? WebSocketFrame msg)
+    (wsockEvent<> co ch msg)
+    (httpEvent<> co ch msg)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- boot!
-  ""
-  [^Pluglet co]
+(defn- boot! "" [^Pluglet co]
+
   (let
     [{:keys [waitMillis] :as cfg}
      (.config co)
@@ -278,9 +268,10 @@
                                :ch (ch?? ctx)})
                  ^RouteInfo
                  ri (some-> (cast? HttpMsg ev)
-                            (.routeGist) (:info))
-                 s? (some-> ri (.isStatic))
-                 hd (some-> ri (.handler))
+                            .routeGist
+                            :info)
+                 s? (some-> ri .isStatic)
+                 hd (some-> ri .handler)
                  hd (if (and s? (nichts? hd))
                       "czlab.wabbit.plugs.io.mvc/asset!" hd)]
                 (if (spos? waitMillis)
@@ -291,8 +282,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn processOrphan
-  ""
-  [^Job job error]
+  "" [^Job job error]
   ;; 500 or 503
   (let [s (or (.getv job :statusCode) 500)
         ^HttpMsg evt (.origin job)]
@@ -304,9 +294,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn Discarder!
-  ""
-  [func arg]
+(defn Discarder! "" [func arg]
   (let
     [ch (-> (discardHTTPD<> func arg)
             (startServer arg))]
@@ -315,8 +303,10 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- httpBasicConfig
+
   "Basic http config"
   [pkey conf cfg0]
+
   (let [{:keys [serverKey
                 port
                 passwd] :as cfg}
@@ -356,8 +346,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- httpXXX<>
-  ""
-  [{:keys [conf] :as pspec}]
+  "" [{:keys [conf] :as pspec}]
+
   (let
     [impl (muble<>)]
     (reify Pluggable
@@ -384,9 +374,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn loadTemplate
-  ""
-  ^APersistentMap
-  [cfg tpath data]
+  "" ^APersistentMap [cfg tpath data]
+
   (let
     [ts (str "/" (triml tpath "/"))
      out (mvc/renderFtl cfg ts data)]
@@ -438,8 +427,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- httpMVC<>
-  ""
-  [{:keys [conf] :as pspec}]
+  "" [{:keys [conf] :as pspec}]
+
   (let
     [impl (muble<>)]
     (reify Pluggable
@@ -474,9 +463,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn WebMVC
-  ""
-  ^Pluggable
+(defn WebMVC "" ^Pluggable
   ([_] (WebMVC _ (WebMVCSpec)))
   ([_ spec] (httpMVC<> spec)))
 
@@ -486,13 +473,10 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn HTTP
-  ""
-  ^Pluggable
+(defn HTTP "" ^Pluggable
   ([_] (HTTP _ (HTTPSpec)))
   ([_ spec] (httpXXX<> spec)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF
-
 

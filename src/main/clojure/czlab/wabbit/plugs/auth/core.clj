@@ -106,7 +106,7 @@
   (if-some
     [itms (cast? ULFormItems
                  (some-> evt
-                         (.body)(.content)))]
+                         .body .content))]
     (preduce<map>
       #(let [fm (.getFieldNameLC ^ULFileItem %2)
              fv (str %2)]
@@ -122,8 +122,8 @@
   "Parse a JSON body"
   [^HttpMsg evt]
   (let
-    [xs (some-> evt (.body) (.getBytes))
-     json (-> (if (some? xs)
+    [xs (some-> evt .body .getBytes)
+     json (-> (if xs
                 (stringify xs) "{}")
               (readJsonStr #(lcase %)))]
     (preduce<map>
@@ -180,7 +180,7 @@
                    (caesarDecrypt shiftCount))
          s (->> decr
                 (.decode (Base64/getMimeDecoder))
-                (stringify))]
+                stringify)]
         (log/debug "info = %s" info)
         (log/debug "decr = %s" decr)
         (log/debug "val = %s" s)
@@ -215,13 +215,15 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn assertPluginOK
+
   "If the plugin has been initialized,
    by looking into the db"
   [^JdbcPool pool]
   {:pre [(some? pool)]}
+
   (let [tbl (->> :czlab.wabbit.plugs.auth.model/LoginAccount
                  (.get ^Schema *auth-meta-cache*)
-                 (dbtable))]
+                 dbtable)]
     (when-not (tableExist? pool tbl)
       (dberr! (rstr (I18N/base)
                     "auth.no.table" tbl)))))
@@ -229,14 +231,13 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- getSQLr
-  ""
-  {:tag SQLr}
+  "" {:tag SQLr}
   ([ctr] (getSQLr ctr false))
   ([^Execvisor ctr tx?]
    {:pre [(some? ctr)]}
    (let [db (-> (.dftDbPool ctr)
                 (dbopen<+> *auth-meta-cache*))]
-     (if (boolean tx?)
+     (if tx?
        (.compositeSQLr db)
        (.simpleSQLr db)))))
 
@@ -280,18 +281,25 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn createLoginAccount
+
   "Create a new account
    props : extra properties, such as email address.
    roleObjs : a list of roles to be assigned to the account"
   {:tag APersistentMap}
 
-  ([sql user pwdObj props] (createLoginAccount sql user pwdObj props nil))
-  ([sql user pwdObj] (createLoginAccount sql user pwdObj nil nil))
-  ([^SQLr sql ^String user ^IPassword pwdObj props roleObjs]
+  ([sql user pwdObj props]
+   (createLoginAccount sql user pwdObj props nil))
+
+  ([sql user pwdObj]
+   (createLoginAccount sql user pwdObj nil nil))
+
+  ([^SQLr sql ^String user
+    ^IPassword pwdObj props roleObjs]
    {:pre [(some? sql)(hgl? user)]}
+
    (let [m (.get (.metas sql)
                  :czlab.wabbit.plugs.auth.model/LoginAccount)
-         ps (if (some? pwdObj)
+         ps (if pwdObj
               (:hash (.hashed pwdObj)))
          acc
          (->>
@@ -312,10 +320,12 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn findLoginAccountViaEmail
+
   "Look for account with this email address"
   ^APersistentMap
   [^SQLr sql ^String email]
   {:pre [(some? sql)]}
+
   (.findOne sql
             :czlab.wabbit.plugs.auth.model/LoginAccount
             {:email (strim email) }))
@@ -323,10 +333,12 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn findLoginAccount
+
   "Look for account with this user id"
   ^APersistentMap
   [^SQLr sql ^String user]
   {:pre [(some? sql)]}
+
   (.findOne sql
             :czlab.wabbit.plugs.auth.model/LoginAccount
             {:acctid (strim user) }))
@@ -334,8 +346,10 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn getLoginAccount
+
   "Get the user account"
   [^SQLr sql ^String user ^String pwd]
+
   (if-some
     [acct (findLoginAccount sql user)]
     (if (.validateHash (passwd<> pwd)
@@ -353,11 +367,13 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn changeLoginAccount
+
   "Change the account password"
   ^APersistentMap
   [^SQLr sql userObj ^IPassword pwdObj]
   {:pre [(some? sql)
          (map? userObj)(some? pwdObj)]}
+
   (let [ps (.hashed pwdObj)
         m {:passwd (:hash ps)
            :salt (:salt ps)}]
@@ -369,11 +385,13 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn updateLoginAccount
+
   "Update account details
    details: a set of properties such as email address"
   ^APersistentMap
   [^SQLr sql userObj details]
   {:pre [(some? sql)(map? userObj)]}
+
   (if-not (empty? details)
     (do
       (->> (dbSetFlds*
@@ -385,26 +403,31 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn deleteLoginAccountRole
+
   "Remove a role from this user"
   ^long
   [^SQLr sql user role]
   {:pre [(some? sql)]}
+
   (dbClrM2M
     {:joined :czlab.wabbit.plugs.auth.model/AccountRoles :with sql} user role))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn addLoginAccountRole
+
   "Add a role to this user"
   ^APersistentMap
   [^SQLr sql user role]
   {:pre [(some? sql)]}
+
   (dbSetM2M
     {:joined :czlab.wabbit.plugs.auth.model/AccountRoles :with sql} user role))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn deleteLoginAccount
+
   "Delete this account"
   ^long
   [^SQLr sql user] {:pre [(some? sql)]} (.delete sql user))
@@ -412,10 +435,12 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn deleteUser
+
   "Delete the account with this user id"
   ^long
   [^SQLr sql ^String user]
   {:pre [(some? sql)]}
+
   (let [m (.get (.metas sql)
                 :czlab.wabbit.plugs.auth.model/LoginAccount)]
     (.exec sql
@@ -427,10 +452,12 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn listLoginAccounts
+
   "List all user accounts"
   ^Iterable
   [^SQLr sql]
   {:pre [(some? sql)]}
+
   (.findAll sql :czlab.wabbit.plugs.auth.model/LoginAccount))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -438,22 +465,25 @@
 (defn- initShiro
   ""
   [^File homeDir ^String podKey]
+
   (let [f (io/file homeDir "etc/shiro.ini")]
     (if-not (fileRead? f)
       (trap! ConfigError "Missing shiro ini file"))
     (-> (io/as-url f)
-      str
-      (IniSecurityManagerFactory. )
-      (.getInstance)
-      (SecurityUtils/setSecurityManager ))
+        str
+        IniSecurityManagerFactory.
+        .getInstance
+        SecurityUtils/setSecurityManager)
     (log/info "created shiro security manager")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn signupTestExpr<>
+
   "Test component of a standard sign-up workflow"
   ^BoolExpr
   [^String challengeStr]
+
   (reify BoolExpr
     (ptest [_ job]
       (let
@@ -511,10 +541,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn loginTestExpr<>
-  ""
-  ^BoolExpr
-  []
+(defn loginTestExpr<> "" ^BoolExpr []
   (reify BoolExpr
     (ptest [_ job]
       (let
@@ -563,6 +590,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- authPluglet<>
+
   ""
   ^AuthPluglet
   [^Execvisor ctr]
@@ -572,7 +600,7 @@
     (reify AuthPluglet
 
       (isEnabled [this]
-          (not (false? (:enabled? (.config this)))))
+          (!false? (:enabled? (.config this))))
 
       (config [_] (.intern impl))
       (spec [_] nil)
@@ -613,8 +641,8 @@
 
       (login [_ u p]
         (binding
-          [*jdbc-pool* (.dftDbPool ctr)
-           *meta-cache* *auth-meta-cache*]
+          [*meta-cache* *auth-meta-cache*
+           *jdbc-pool* (.dftDbPool ctr)]
           (let
             [cur (SecurityUtils/getSubject)
              sss (.getSession cur)]
@@ -676,18 +704,16 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- doMain
-  ""
-  [& args]
+(defn- doMain "" [& args]
   (let [homeDir (io/file (first args))
         cmd (nth args 1)
         db (nth args 2)
         pod (slurpXXXConf homeDir cfg-pod-cf true)
-        pkey (-> (get-in pod [:info :digest])
-                 str
-                 (.toCharArray))
+        pkey (-> (get-in pod
+                         [:info :digest])
+                 str .toCharArray)
         cfg (get-in pod [:rdbms (keyword db)])]
-    (when (some? cfg)
+    (when cfg
       (let [pwd (.text (passwd<> (:passwd cfg) pkey))
             j (dbspec<> (assoc cfg :passwd pwd))
             t (matchUrl (:url cfg))]
@@ -703,10 +729,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; home gen-sql alias outfile
 ;; home init-db alias
-(defn -main
-  "Main Entry"
-  [& args]
-
+(defn -main "Main Entry" [& args]
   ;; for security, don't just eval stuff
   ;;(alter-var-root #'*read-eval* (constantly false))
   (if-not (< (count args) 3) (apply doMain args)))

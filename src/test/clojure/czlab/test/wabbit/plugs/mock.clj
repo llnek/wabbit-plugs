@@ -32,10 +32,8 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- mkexe
-  ""
-  ^Execvisor
-  []
+(defn- mkexe "" ^Execvisor []
+
   (let
     [rts (Cljshim/newrt (getCldr) "mock")
      pid (juid)
@@ -80,19 +78,12 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- init
-  ""
-  [^Execvisor co]
-  (let []
-    (.activate ^Activable (.core co) nil) co))
+(defn- init "" [^Execvisor co]
+    (.activate ^Activable (.core co) nil) co)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn mocker
-  ""
-  ^Execvisor
-  [_]
-  (doto (mkexe) (init )))
+(defn mocker "" ^Execvisor [_] (doto (mkexe) init ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF

@@ -13,7 +13,7 @@
     <Logger name="czlab" level="info" additivity="false">
       <AppenderRef ref="STDOUT"/>
     </Logger>
-    <Root level="info">
+    <Root level="error">
       <AppenderRef ref="STDOUT"/>
     </Root>
   </Loggers>

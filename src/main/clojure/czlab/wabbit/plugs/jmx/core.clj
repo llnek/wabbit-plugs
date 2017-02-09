@@ -44,11 +44,15 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn objectName<>
+
   "paths: [ \"a=b\" \"c=d\" ]
    domain: com.acme
    beanName: mybean"
   {:tag ObjectName}
-  ([domain beanName] (objectName<> domain beanName nil))
+
+  ([domain beanName]
+   (objectName<> domain beanName nil))
+
   ([^String domain ^String beanName paths]
    (let [cs (seq (or paths []))
          sb (strbf<>)]
@@ -60,32 +64,27 @@
      (doto sb
        (.append "name=")
        (.append beanName))
-     (ObjectName. (.toString sb)))))
+     (ObjectName. (str sb)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- mkJMXrror
-  ""
-  [^String msg ^Throwable e]
+  "" [^String msg ^Throwable e]
   (throw (doto (JMException. msg) (.initCause e))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- startRMI
-  ""
-  [^Muble impl]
+(defn- startRMI "" [^Muble impl]
   (try
     (->> (long (.getv impl :registryPort))
-         (LocateRegistry/createRegistry )
+         LocateRegistry/createRegistry
          (.setv impl :rmi ))
     (catch Throwable _
       (mkJMXrror "Failed to create RMI registry" _))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- startJMX
-  ""
-  [^Muble impl]
+(defn- startJMX "" [^Muble impl]
   (let
     [cfc "com.sun.jndi.rmi.registry.RegistryContextFactory"
      svc (str "service:jmx:rmi://{{h}}:{{s}}"
@@ -123,20 +122,18 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- jmsPluglet<>
-  ""
-  ^JmxPluglet
-  [^Execvisor ctr]
+  "" ^JmxPluglet [^Execvisor ctr]
   (let
     [impl (muble<> {:registryPort 7777
                     :serverPort 7778
                     :host (-> (InetAddress/getLocalHost)
-                              (.getHostName))})
+                              .getHostName)})
      pid (str "jmx#" (seqint2))
      objNames (atom [])]
     (reify JmxPluglet
 
       (isEnabled [this]
-        (not (false? (:enabled? (.config this)))))
+        (!false? (:enabled? (.config this))))
 
       (config [_] (.intern impl))
       (spec [_] nil)
@@ -179,7 +176,7 @@
         (let [^JMXConnectorServer c (.getv impl :conn)
               ^Registry r (.getv impl :rmi)]
           (.reset this)
-          (try! (some-> c (.stop )))
+          (try! (some-> c .stop ))
           (.unsetv impl :conn)
           (try!
             (some-> r

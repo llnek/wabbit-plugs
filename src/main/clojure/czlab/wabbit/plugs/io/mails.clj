@@ -61,22 +61,20 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- closeFolder
-  ""
-  [^Folder fd]
-  (if (some? fd)
+(defn- closeFolder "" [^Folder fd]
+
+  (if fd
     (try!
       (if (.isOpen fd) (.close fd true)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- closeStore
-  ""
-  [^Pluglet co]
+(defn- closeStore "" [^Pluglet co]
+
   (let [{:keys [store folder]}
         (.intern (.getx co))]
     (closeFolder folder)
-    (if (some? store)
+    (if store
       (try!
         (.close ^Store store)))
     (doto (.getx co)
@@ -88,6 +86,7 @@
 (defn- resolveProvider
   ""
   [^Pluglet co ^String cz ^String proto]
+
   (let
     [mockp (sysProp "wabbit.mock.mail.proto")
      demo? (hgl? mockp)
@@ -116,8 +115,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- evt<>
-  ""
-  [^Pluglet co {:keys [msg]}]
+  "" [^Pluglet co {:keys [msg]}]
+
   (let [eeid (str "event#" (seqint2))]
     (with-meta
       (reify MailMsg
@@ -129,9 +128,8 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- connectPop3
-  ""
-  [^Pluglet co]
+(defn- connectPop3 "" [^Pluglet co]
+
   (let [{:keys [^Session session
                 ^String proto]}
         (.intern (.getx co))
@@ -160,9 +158,8 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- readPop3
-  ""
-  [^Pluglet co msgs]
+(defn- readPop3 "" [^Pluglet co msgs]
+
   (let [d? (.getv (.getx co) :deleteMsg?)]
     (doseq [^MimeMessage mm  msgs]
       (doto mm
@@ -173,15 +170,14 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- scanPop3
-  ""
-  [^Pluglet co]
+(defn- scanPop3 "" [^Pluglet co]
+
   (let [{:keys [^Folder folder ^Store store]}
         (.intern (.getx co))]
-    (if (and (some? folder)
+    (if (and folder
              (not (.isOpen folder)))
       (.open folder Folder/READ_WRITE))
-    (when (and (some? folder)
+    (when (and folder
                (.isOpen folder))
       (try
         (let [cnt (.getMessageCount folder)]
@@ -193,14 +189,13 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- wake<o>
-  ""
-  [^Pluglet co]
+(defn- wake<o> "" [^Pluglet co]
+
   (try
     (connectPop3 co)
     (scanPop3 co)
-    (catch Throwable e#
-      (log/exception e#))
+    (catch Throwable _
+      (log/exception _))
     (finally
       (closeStore co))))
 
@@ -210,7 +205,8 @@
   ""
   [pkey {:keys [port deleteMsg?
                 host user ssl? passwd] :as cfg0}]
-  (-> (assoc cfg0 :ssl? (not (false? ssl?)))
+
+  (-> (assoc cfg0 :ssl? (!false? ssl?))
       (assoc :deleteMsg? (true? deleteMsg?))
       (assoc :host (str host))
       (assoc :port (if (spos? port) port 995))
@@ -240,9 +236,8 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn POP3
-  ""
-  ^Pluggable
+(defn POP3 "" ^Pluggable
+
   ([_] (POP3 _ (POP3Spec)))
   ([_ {:keys [conf] :as pspec}]
    (let
@@ -279,14 +274,13 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- wake<i>
-  ""
-  [co]
+(defn- wake<i> "" [co]
+
   (try
     (connectIMAP co)
     (scanIMAP co)
-    (catch Throwable e#
-      (log/exception e#))
+    (catch Throwable _
+      (log/exception _))
     (finally
       (closeStore co))))
 
@@ -314,9 +308,8 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn IMAP
-  ""
-  ^Pluggable
+(defn IMAP "" ^Pluggable
+
   ([_] (IMAP _ (IMAPSpec)))
   ([_ {:keys [conf] :as pspec}]
    (let
@@ -345,5 +338,4 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF
-
 

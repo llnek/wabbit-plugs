@@ -71,17 +71,15 @@
             (try!
               (doto->> (io/file recvFolder orig)
                        (FileUtils/moveFile f))))]
-      (->> (evt<> (.parent co)
+      (-> (evt<> (.parent co)
                   {:fname orig
                    :fp cf :action action})
-           (dispatch! )))))
+          dispatch! ))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- toFMask
-  ""
-  ^FileFilter
-  [^String mask]
+  "" ^FileFilter [^String mask]
   (cond
     (.startsWith mask "*.")
     (SuffixFileFilter. (.substring mask 1))
@@ -98,8 +96,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- init2
-  ""
-  [conf cfg0]
+  "" [conf cfg0]
   (let
     [{:keys [recvFolder
              fmask
@@ -127,7 +124,7 @@
   (let
     [obs (FileAlterationObserver. (io/file targetFolder) fmask)
      mon (-> (s2ms intervalSecs)
-             (FileAlterationMonitor.))]
+             FileAlterationMonitor.)]
     (->>
       (proxy [FileAlterationListenerAdaptor][]
         (onFileCreate [f]
@@ -161,10 +158,10 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn FilePicker
-  ""
-  ^Pluggable
+(defn FilePicker "" ^Pluggable
+
   ([_] (FilePicker _ (FilePickerSpec)))
+
   ([_ {:keys [conf] :as pspec}]
    (let
      [impl (muble<>)
@@ -172,7 +169,7 @@
       #(let [_ %]
          (log/info "apache io monitor starting...")
          (some-> ^FileAlterationMonitor
-                 (.getv impl :$mon) (.start)))]
+                 (.getv impl :$mon) .start))]
      (reify Pluggable
        (setParent [_ p] (.setv impl :$parent p))
        (parent [_] (.getv impl :$parent))
@@ -191,9 +188,8 @@
        (stop [_]
          (log/info "apache io monitor stopping...")
          (some-> ^FileAlterationMonitor
-                 (.unsetv impl :$mon) (.stop)))))))
+                 (.unsetv impl :$mon) .stop))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF
-
 

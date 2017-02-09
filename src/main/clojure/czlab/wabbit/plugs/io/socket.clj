@@ -32,8 +32,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- evt<>
-  ""
-  [co {:keys [^Socket socket]}]
+  "" [co {:keys [^Socket socket]}]
 
   (let [eeid (str "event#" (seqint2))]
     (with-meta
@@ -49,8 +48,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- sockItDown
-  ""
-  [^Pluggable co soc]
+  "" [^Pluggable co soc]
+
   (try!
     (log/debug "opened socket: %s" soc)
     (dispatch! (evt<> (.parent co) {:socket soc}))))
@@ -58,9 +57,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- ssoc<>
-  ""
-  ^ServerSocket
+  "" ^ServerSocket
   [{:keys [timeoutMillis backlog host port]}]
+
   (let
     [ip (if (hgl? host)
           (InetAddress/getByName host)
@@ -90,9 +89,8 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn SocketIO
-  ""
-  ^Pluggable
+(defn SocketIO "" ^Pluggable
+
   ([_] (SocketIO _ (SocketIOSpec)))
   ([_ {:keys [conf] :as pspec}]
    (let
@@ -126,5 +124,4 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF
-
 

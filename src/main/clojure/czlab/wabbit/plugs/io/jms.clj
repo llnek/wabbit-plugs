@@ -51,8 +51,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- evt<>
-  ""
-  [co {:keys [msg]}]
+  "" [co {:keys [msg]}]
+
   (let [eeid (str "event#" (seqint2))
         impl (muble<>)]
     (with-meta
@@ -65,18 +65,16 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- onMsg
-  ""
-  [co msg]
+(defn- onMsg "" [co msg]
   ;;if (msg!=null) block { () => msg.acknowledge() }
   (dispatch! (evt<> co {:msg msg})))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- inizFac
-  ""
-  ^Connection
+  "" ^Connection
   [^Pluggable co ^InitialContext ctx ^ConnectionFactory cf]
+
   (let
     [{:keys [^String destination
              ^String jmsPwd
@@ -84,7 +82,7 @@
      (.config co)
      ^Pluglet pg (.parent co)
      pwd (->> (.server pg)
-              (.pkey )
+              .pkey
               (passwd<> jmsPwd))
      c (.lookup ctx destination)
      ^Connection
@@ -107,9 +105,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- inizTopic
-  ""
-  ^Connection
+  "" ^Connection
   [^Pluggable co ^InitialContext ctx ^TopicConnectionFactory cf]
+
   (let
     [{:keys [^String destination
              ^String jmsUser
@@ -118,7 +116,7 @@
      (.config co)
      ^Pluglet pg (.parent co)
      pwd (->> (.server pg)
-              (.pkey)
+              .pkey
               (passwd<> jmsPwd))
      conn (if (hgl? jmsUser)
             (.createTopicConnection
@@ -142,9 +140,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- inizQueue
-  ""
-  ^Connection
+  "" ^Connection
   [^Pluggable co ^InitialContext ctx ^QueueConnectionFactory cf]
+
   (let
     [{:keys [^String destination
              ^String jmsUser
@@ -152,7 +150,7 @@
      (.config co)
      ^Pluglet pg (.parent co)
      pwd (->> (.server pg)
-              (.pkey)
+              .pkey
               (passwd<> jmsPwd))
      conn (if (hgl? jmsUser)
             (.createQueueConnection
@@ -176,17 +174,20 @@
 (defn- sanitize
   ""
   [pkey {:keys [jndiPwd jmsPwd] :as cfg}]
+
   (-> (assoc cfg :jndiPwd (.text (passwd<> jndiPwd pkey)))
       (assoc :jmsPwd (.text (passwd<> jmsPwd pkey)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- start2
+
   ""
   ^Connection
   [^Pluggable co {:keys [contextFactory
                          providerUrl
                          jndiUser jndiPwd connFactory]}]
+
   (let
     [vars (Hashtable.)]
     (if (hgl? providerUrl)
@@ -240,9 +241,8 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn JMS
-  ""
-  ^Pluggable
+(defn JMS "" ^Pluggable
+
   ([_] (JMS _ (JMSSpec)))
   ([_ {:keys [conf] :as pspec}]
    (let
@@ -270,5 +270,4 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF
-
 

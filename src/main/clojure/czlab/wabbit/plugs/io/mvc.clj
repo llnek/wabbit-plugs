@@ -230,7 +230,7 @@
           (.setContent res fp)
           (replyResult res)))
       (catch Throwable e#
-        (log/error "get: %s" (:uri gist) e#)
+        (log/error e# "get: %s" (:uri gist))
         (try!
           (.setStatus res 500)
           (.setContent res nil)
@@ -249,7 +249,7 @@
                       server homeDir)
           r (.routeGist evt)
           mp (some-> ^RouteInfo
-                     (:info r) (.mountPoint))
+                     (:info r) .mountPoint)
           fp (str
                (reduce
                  (fn [a b] (cs/replace-first a "{}" b))
@@ -268,7 +268,7 @@
            (let [ch (.socket evt)]
              (log/warn "illegal access: %s" fpath)
              (-> (httpResult<> ch gist 403)
-                 (replyResult ))))))))
+                 replyResult )))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -276,5 +276,4 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF
-
 
