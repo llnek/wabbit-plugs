@@ -14,16 +14,17 @@
    ;;[com.google.code.findbugs/jsr305 "3.0.1"]
    [org.freemarker/freemarker "2.3.25-incubating"]
    [org.apache.shiro/shiro-core "1.3.2"]
-   [io.czlab/proto "1.0.0" :scope "test"]
+   [org.clojure/clojure "1.8.0"]
    [io.czlab/flux "1.0.0"]
    [io.czlab/nettio "1.0.0"]
    [io.czlab/wabbit "1.0.0"]]
 
   :plugins [[lein-codox "0.10.2"]
+            [lein-czlab "1.0.0"]
             [lein-pprint "1.1.2"]]
 
   :profiles {:provided {:dependencies
-                        [[org.clojure/clojure "1.8.0" :scope "provided"]
+                        [[io.czlab/proto "1.0.0" :scope "test"]
                          [net.mikera/cljunit "0.6.0" :scope "test"]
                          [junit/junit "4.12" :scope "test"]
                          [codox/codox "0.10.2" :scope "provided"]]}
