@@ -22,11 +22,13 @@
         [czlab.convoy.net.wess]
         [czlab.basal.consts]
         [czlab.basal.core]
+        [czlab.basal.io]
         [czlab.basal.str]
         [czlab.flux.wflow.core]
         [czlab.wabbit.plugs.io.core])
 
-  (:import [freemarker.template
+  (:import [clojure.lang APersistentMap]
+           [freemarker.template
             TemplateMethodModelEx
             TemplateBooleanModel
             TemplateCollectionModel
@@ -184,6 +186,23 @@
                  model)
                out))
    (str out)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+(defn loadTemplate
+  "" ^APersistentMap [^Pluglet co tpath data]
+
+  (let
+    [c (. (.getx co) getv :$ftlCfg)
+     ts (str "/" (triml tpath "/"))
+     out (renderFtl c ts data)]
+    {:data (xdata<> out)
+     :ctype
+     (cond
+       (.endsWith ts ".json") "application/json"
+       (.endsWith ts ".xml") "application/xml"
+       (.endsWith ts ".html") "text/html"
+       :else "text/plain")}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

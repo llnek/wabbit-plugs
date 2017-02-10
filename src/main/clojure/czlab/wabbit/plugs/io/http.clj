@@ -286,11 +286,11 @@
   ;; 500 or 503
   (let [s (or (.getv job :statusCode) 500)
         ^HttpMsg evt (.origin job)]
-    (->> (httpResult<>
-           (.socket evt)
-           (.msgGist evt)
-           (HttpResponseStatus/valueOf s))
-         (replyResult (.socket evt)))))
+    (-> (httpResult<>
+          (.socket evt)
+          (.msgGist evt)
+          (HttpResponseStatus/valueOf s))
+        replyResult )))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -370,22 +370,6 @@
           [c (.unsetv impl :$chan)]
           (stopServer c))
         (.unsetv impl :$boot)))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-(defn loadTemplate
-  "" ^APersistentMap [cfg tpath data]
-
-  (let
-    [ts (str "/" (triml tpath "/"))
-     out (mvc/renderFtl cfg ts data)]
-    {:data (xdata<> out)
-     :ctype
-     (cond
-       (.endsWith ts ".json") "application/json"
-       (.endsWith ts ".xml") "application/xml"
-       (.endsWith ts ".html") "text/html"
-       :else "text/plain")}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
