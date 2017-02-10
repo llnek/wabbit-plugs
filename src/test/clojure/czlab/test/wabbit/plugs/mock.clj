@@ -23,6 +23,7 @@
         [czlab.basal.io])
 
   (:import [czlab.jasal Activable Schedulable]
+           [czlab.wabbit.plugs.io HttpMsg]
            [czlab.wabbit.sys Execvisor]
            [czlab.wabbit.base Cljshim]
            [czlab.wabbit.ctl PlugMsg]))
@@ -84,6 +85,36 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn mocker "" ^Execvisor [_] (doto (mkexe) init ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+(defn mockHttpMsg "" []
+
+  (reify HttpMsg
+    (isStale [_] false)
+    (source [_] )
+    (id [_] )
+    (fire [_ arg] )
+    (setTrigger [_ arg] )
+    (cancel [_] )
+    (body [_] )
+    (checkSession [_] false)
+    (cookie [_ n] )
+    (cookies [_] )
+    (isSSL [_] false)
+    (localAddr [_] "")
+    (localHost [_] "")
+    (localPort [_] 0)
+    (msgGist [_] )
+    (remoteAddr [_] )
+    (remoteHost [_] "")
+    (remotePort [_] 0)
+    (routeGist [_] )
+    (scheme [_] "")
+    (serverName [_] "")
+    (serverPort [_] 0)
+    (session [_] )
+    (getx [_] )))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF
