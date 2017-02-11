@@ -11,7 +11,7 @@
 
   czlab.wabbit.plugs.io.mvc
 
-  (:require [clojure.walk :as cw :refer [postwalk]]
+  (:require [clojure.walk :refer [postwalk]]
             [czlab.basal.logging :as log]
             [clojure.string :as cs]
             [clojure.java.io :as io])
@@ -119,10 +119,10 @@
 ;;
 (defn- asFtlModel "" [m]
 
-  (cw/postwalk #(cond
-                  (map? %) (into {} (map skey %))
-                  (fn? %) (asFtlMethod %)
-                  :else %) m))
+  (postwalk #(cond
+               (map? %) (into {} (map skey %))
+               (fn? %) (asFtlMethod %)
+               :else %) m))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
