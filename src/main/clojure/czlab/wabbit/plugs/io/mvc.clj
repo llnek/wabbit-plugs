@@ -59,88 +59,70 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defprotocol FtlCljApi (ftl->clj [obj] ))
+(defprotocol CljApi (->clj [_] ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(extend-protocol FtlCljApi
-
-  TemplateBooleanModel
-  (ftl->clj [obj]
-    (.getAsBoolean obj))
+(extend-protocol CljApi
 
   TemplateCollectionModel
-  (ftl->clj [obj]
-    (when-some
-      [itr (.iterator obj)]
-      (loop [acc []]
-        (if (.hasNext itr)
-          (recur (conj acc
-                       (ftl->clj (.next itr))))
-          acc))))
-
-  TemplateDateModel
-  (ftl->clj [obj]
-    (.getAsDate obj))
-
-  TemplateHashModelEx
-  (ftl->clj [obj]
-    (zipmap (ftl->clj (.keys obj))
-            (ftl->clj (.values obj))))
-
-  TemplateNumberModel
-  (ftl->clj [obj]
-    (.getAsNumber obj))
-
-  TemplateScalarModel
-  (ftl->clj [obj]
-    (.getAsString obj))
+  (->clj [itr]
+    (loop [acc []]
+      (if (and (some? itr)
+               (.hasNext itr))
+        (recur (conj acc
+                     (->clj (.next itr))))
+        acc)))
 
   TemplateSequenceModel
-  (ftl->clj [obj]
-    (for [i (range (.size obj))]
-      (ftl->clj (.get obj i))))
+  (->clj [s]
+    (for [n (range (.size s))]
+      (->clj (.get s n))))
+
+  TemplateHashModelEx
+  (->clj [m]
+    (zipmap (->clj (.keys m))
+            (->clj (.values m))))
+
+  TemplateBooleanModel
+  (->clj [_] (.getAsBoolean _))
+
+  TemplateNumberModel
+  (->clj [_] (.getAsNumber _))
+
+  TemplateScalarModel
+  (->clj [_] (.getAsString _))
+
+  TemplateDateModel
+  (->clj [_] (.getAsDate _))
 
   Object
-  (ftl->clj [obj]
+  (->clj [_]
     (throwBadArg
-      "Can't convert %s to clj" (class obj))))
+      "Failed to convert %s" (class _))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- fn->method
-  ""
-  [func]
+(defn- asFtlMethod "" [func]
+
   (reify
     TemplateMethodModelEx
-    (exec [_ args]
-      (apply func (map ftl->clj args)))))
+    (exec [_ args] (apply func (map ->clj args)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- strkey
-  ""
-  [[k v]]
+(defn- skey "" [[k v]]
 
-  (if (keyword? k)
-    [(.replace (name k) "-" "_") v]
-    [k v]))
+  [(cs/replace (strKW k) #"[$!#*+\-]" "_")  v])
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- map->model
-  "Stringifies keys replacing hyphens with underscores,
-   and replaces functions with template methods"
-  [m]
-  (cw/postwalk
-    (fn [x]
-      (cond
-        (map? x)
-        (into {} (map strkey x))
-        (fn? x)
-        (fn->method x)
-        :else x))
-    m))
+(defn- asFtlModel "" [m]
+
+  (cw/postwalk #(cond
+                  (map? %) (into {} (map skey %))
+                  (fn? %) (asFtlMethod %)
+                  :else %) m))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -151,23 +133,24 @@
   ([] (genFtlConfig nil))
   ([{:keys [root shared] :or {shared {}}}]
    (let [cfg (Configuration.)]
-     (if-some [dir (cast? File (io/file root))]
+     (if-some [dir (io/file root)]
        (when (.exists dir)
          (log/info "freemarker template source: %s" root)
          (doto cfg
            (.setDirectoryForTemplateLoading dir)
            (.setObjectWrapper (DefaultObjectWrapper.)))
-         (doseq [[k v] (map->model shared)]
+         (doseq [[k v] (asFtlModel shared)]
            (.setSharedVariable cfg ^String k v))))
      cfg)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn renderFtl
+
   "Renders a template given by Configuration cfg and a path
    using model as input and writes it to out
    If out is not provided, returns a string
-   If translate-model? is true, map->model is run on the model"
+   If xrefModel? is true, asFtlModel is run on the model"
   {:tag String}
 
   ([cfg writer path model]
@@ -177,14 +160,11 @@
    (renderFtl cfg (StringWriter.) path model nil))
 
   ([^Configuration cfg ^Writer out
-    ^String path model {:keys [translate-model?]
-                        :or {translate-model? true}}]
-   (when-some [tpl (.getTemplate cfg path)]
-     (.process tpl
-               (if translate-model?
-                 (map->model model)
-                 model)
-               out))
+    ^String path model {:keys [xrefModel?]
+                        :or {xrefModel? true}}]
+   (some-> (.getTemplate cfg path)
+           (.process (if xrefModel?
+                       (asFtlModel model) model) out))
    (str out)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

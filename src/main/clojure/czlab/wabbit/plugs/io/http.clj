@@ -11,8 +11,8 @@
 
   czlab.wabbit.plugs.io.http
 
-  (:require [czlab.convoy.net.util :refer [parseBasicAuth]]
-            [czlab.basal.io :refer [xdata<> slurpUtf8]]
+  (:require [czlab.basal.io :refer [dirReadWrite? xdata<> slurpUtf8]]
+            [czlab.convoy.net.util :refer [parseBasicAuth]]
             [czlab.basal.format :refer [readEdn]]
             [czlab.twisty.codec :refer [passwd<>]]
             [czlab.basal.logging :as log]
@@ -307,11 +307,13 @@
   "Basic http config"
   [pkey conf cfg0]
 
-  (let [{:keys [serverKey
+  (let [{:keys [publicRootDir
+                serverKey
                 port
                 passwd] :as cfg}
         (merge conf cfg0)
-        kfile (expandVars serverKey)
+        pubDir publicRootDir
+        kfile serverKey
         ssl? (hgl? kfile)]
     (if ssl?
       (test-cond "server-key file url"
@@ -320,6 +322,7 @@
       {:port (if-not (spos? port) (if ssl? 443 80) port)
        :routes (maybeLoadRoutes cfg)
        :passwd (.text (passwd<> passwd pkey))
+       :publicRootDir pubDir
        :serverKey (if ssl? (io/as-url kfile))}
       (merge cfg ))))
 
@@ -392,21 +395,22 @@
           :sessionAgeSecs 2592000
           :maxIdleSecs 0
           :hidden true
+          :websockPath ""
           :domain ""
           :domainPath "/"
           :maxAgeSecs 3600
           :useETags? false
           :errorHandler nil
           :handler nil
+          :publicRootDir "${pod.dir}/public"
+          :mediaDir "res"
+          :pageDir "htm"
+          :jsDir "jsc"
+          :cssDir "css"
           :routes
-          [{:mount "${pod.dir}/public/media/main/{}"
-            :uri "/(favicon\\..+)"}
-           {:mount "${pod.dir}/public/{}"
-            :uri "/public/(.*)"}
-           {:handler ""
-            :uri "/?"
-            :verbs #{:get}
-            :template  "/main/index.html"}]}})
+          [{:mount "res/{}" :uri "/(favicon\\..+)"}
+           {:mount "{}" :uri "/public/(.*)"}
+           {:uri "/?" :template  "main/index.html"}]}})
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -424,10 +428,12 @@
       (init [this arg]
         (let [^Pluglet pg (.parent this)
               h (.. pg server homeDir)
-              root (io/file h "public/pages")
-              k (.. pg server pkey)]
-          (.copyEx impl
-                   (httpBasicConfig k conf arg))
+              k (.. pg server pkey)
+              {:keys [publicRootDir pageDir] :as cfg}
+              (httpBasicConfig k conf arg)
+              root (io/file publicRootDir pageDir)]
+          (test-cond "tpl root" (dirReadWrite? root))
+          (.copyEx impl cfg)
           (.setv impl
                  :$ftlCfg
                  (mvc/genFtlConfig {:root root}))))

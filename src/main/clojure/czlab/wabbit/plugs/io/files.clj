@@ -102,8 +102,8 @@
              fmask
              targetFolder] :as c2}
      (merge conf cfg0)
-     root (expandVars targetFolder)
-     dest (expandVars recvFolder)
+     root targetFolder
+     dest recvFolder
      ff (toFMask (str fmask))]
     (test-hgl "file-root-folder" root)
     (log/info
