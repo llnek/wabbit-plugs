@@ -313,7 +313,7 @@
                 passwd] :as cfg}
         (merge conf cfg0)
         pubDir publicRootDir
-        kfile serverKey
+        ^String kfile serverKey
         ssl? (hgl? kfile)]
     (if ssl?
       (test-cond "server-key file url"
@@ -432,7 +432,7 @@
               {:keys [publicRootDir pageDir] :as cfg}
               (httpBasicConfig k conf arg)
               root (io/file publicRootDir pageDir)]
-          (test-cond "tpl root" (dirReadWrite? root))
+          (log/debug "freemarker tpl root: %s" (fpath root))
           (.copyEx impl cfg)
           (.setv impl
                  :$ftlCfg

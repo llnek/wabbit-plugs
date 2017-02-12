@@ -66,13 +66,13 @@
 (extend-protocol CljApi
 
   TemplateCollectionModel
-  (->clj [itr]
-    (loop [acc []]
-      (if (and (some? itr)
-               (.hasNext itr))
-        (recur (conj acc
-                     (->clj (.next itr))))
-        acc)))
+  (->clj [_]
+    (if-some [itr (.iterator _)]
+      (loop [acc []]
+        (if (.hasNext itr)
+          (recur (conj acc
+                       (->clj (.next itr))))
+          acc))))
 
   TemplateSequenceModel
   (->clj [s]
@@ -162,6 +162,7 @@
   ([^Configuration cfg ^Writer out
     ^String path model {:keys [xrefModel?]
                         :or {xrefModel? true}}]
+   (log/debug "request to render tpl: %s" path)
    (some-> (.getTemplate cfg path)
            (.process (if xrefModel?
                        (asFtlModel model) model) out))
@@ -242,30 +243,33 @@
     (script<>
       #(let
          [^HttpMsg evt (.origin ^Job %2)
-          cfg (.. evt source config)
-          homeDir (.. evt
-                      source
-                      server homeDir)
+          gist (.msgGist evt)
+          {:keys [publicRootDir] :as cfg}
+          (.. evt source config)
+          homeDir (fpath (.. evt
+                             source server homeDir))
           r (.routeGist evt)
-          mp (some-> ^RouteInfo
-                     (:info r) .mountPoint)
-          fp (str
-               (reduce
-                 (fn [a b] (cs/replace-first a "{}" b))
-                 (cs/replace (str mp)
-                             "${pod.dir}" (fpath homeDir))
-                 (:groups r)))
-          pubDir (io/file homeDir dn-pub)
-          check? (:fileAccessCheck? cfg)
-          gist (.msgGist evt)]
-         (log/debug "request for asset: %s" fp)
-         (if (or (false? check?)
-                 (.startsWith fp
-                              (fpath pubDir)))
-           (->> (maybeStripUrlCrap fp)
-                (getStatic evt))
+          mp (str (some-> ^RouteInfo
+                          (:info r) .mountPoint))
+          ;;need to do this for testing only since expandvars
+          ;;not called
+          publicRootDir (expandVars publicRootDir)
+          pubDir (io/file publicRootDir)
+          fp (-> (reduce
+                   (fn [a b] (cs/replace-first a "{}" b))
+                   mp (:groups r))
+                 maybeStripUrlCrap
+                 strim)
+          ffile (io/file pubDir fp)
+          check? (:fileAccessCheck? cfg)]
+         (log/info "request for asset: dir=%s, fp=%s" publicRootDir fp)
+         (if (and (hgl? fp)
+                  (or (false? check?)
+                      (.startsWith (fpath ffile)
+                                   (fpath pubDir))))
+           (getStatic evt ffile)
            (let [ch (.socket evt)]
-             (log/warn "illegal access: %s" fpath)
+             (log/warn "illegal uri access: %s" fp)
              (-> (httpResult<> ch gist 403)
                  replyResult )))))))
 
