@@ -174,8 +174,8 @@
   "" ^APersistentMap [^Pluglet co tpath data]
 
   (let
-    [c (. (.getx co) getv :$ftlCfg)
-     ts (str "/" (triml tpath "/"))
+    [ts (str "/" (triml tpath "/"))
+     c (:$ftlCfg (.config co))
      out (renderFtl c ts data)]
     {:data (xdata<> out)
      :ctype

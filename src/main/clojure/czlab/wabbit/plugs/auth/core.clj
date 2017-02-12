@@ -11,6 +11,8 @@
 
   czlab.wabbit.plugs.auth.core
 
+  ;;(:gen-class)
+
   (:require [czlab.basal.format :refer [readEdn readJsonStr writeJsonStr]]
             [czlab.twisty.codec :refer [caesarDecrypt passwd<>]]
             [czlab.convoy.net.util :refer [filterFormFields]]
@@ -729,7 +731,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; home gen-sql alias outfile
 ;; home init-db alias
-(defn -main "Main Entry" [& args]
+(defn- main "Main Entry" [& args]
   ;; for security, don't just eval stuff
   ;;(alter-var-root #'*read-eval* (constantly false))
   (if-not (< (count args) 3) (apply doMain args)))

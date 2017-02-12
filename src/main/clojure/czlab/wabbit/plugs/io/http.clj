@@ -271,7 +271,7 @@
                             .routeGist
                             :info)
                  s? (some-> ri .isStatic)
-                 hd (some-> ri .handler)
+                 hd (strKW (some-> ri .handler))
                  hd (if (and s? (nichts? hd))
                       "czlab.wabbit.plugs.io.mvc/asset!" hd)]
                 (if (spos? waitMillis)
@@ -423,7 +423,7 @@
       (setParent [_ p] (.setv impl :$parent p))
       (parent [_] (.getv impl :$parent))
       (config [_] (dissoc (.intern impl)
-                          :$ftlCfg :$parent :$boot :$chan))
+                          :$parent :$boot :$chan))
       (spec [_] pspec)
       (init [this arg]
         (let [^Pluglet pg (.parent this)
@@ -455,7 +455,7 @@
 ;;
 (defn WebMVC "" ^Pluggable
   ([_] (WebMVC _ (WebMVCSpec)))
-  ([_ spec] (httpMVC<> spec)))
+  ([_ spec] (httpMVC<> (update-in spec [:conf] expandVarsInForm))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -465,7 +465,7 @@
 ;;
 (defn HTTP "" ^Pluggable
   ([_] (HTTP _ (HTTPSpec)))
-  ([_ spec] (httpXXX<> spec)))
+  ([_ spec] (httpXXX<> (update-in spec [:conf] expandVarsInForm))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF
