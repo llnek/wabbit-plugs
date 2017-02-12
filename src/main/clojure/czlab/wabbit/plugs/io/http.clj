@@ -181,10 +181,12 @@
      ri (get-in gist [:route :info])
      eeid (str "event#" (seqint2))
      cookieJar (:cookies gist)
-     ws? (and (!false? wantSession?)
-              (some-> ri .wantSession))
-     se? (and (!false? isSecure?)
-              (some-> ri .isSecure))
+     ws? (or (true? wantSession?)
+             (and (!false? wantSession?)
+                  (some-> ri .wantSession)))
+     se? (or (true? isSecure?)
+             (and (!false? isSecure?)
+                  (some-> ri .isSecure)))
      pkey (.. co server pkeyBytes)
      wss (if ws? (upstream pkey cookieJar se?))
      impl (muble<> {:$session wss :$stale? false})]
@@ -393,6 +395,8 @@
           :serverKey ""
           :passwd ""
           :sessionAgeSecs 2592000
+          ;;:wantSession? true
+          ;;:isSecure? true
           :maxIdleSecs 0
           :hidden true
           :websockPath ""

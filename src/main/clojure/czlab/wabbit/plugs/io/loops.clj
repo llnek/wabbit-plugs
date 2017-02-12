@@ -154,11 +154,12 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- xxxTimer<>
-  "" [{:keys [conf] :as tspec} repeat?]
+(defn- xxxTimer<> "" [spec repeat?]
 
   (let
-    [impl (muble<>)
+    [{:keys [conf] :as tspec}
+     (update-in spec [:conf] expandVarsInForm)
+     impl (muble<>)
      stop #(try!
              (some-> ^Timer
                      (.unsetv impl :$timer)

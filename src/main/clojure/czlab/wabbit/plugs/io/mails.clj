@@ -239,9 +239,11 @@
 (defn POP3 "" ^Pluggable
 
   ([_] (POP3 _ (POP3Spec)))
-  ([_ {:keys [conf] :as pspec}]
+  ([_ spec]
    (let
-     [impl (muble<>)]
+     [{:keys [conf] :as pspec}
+      (update-in spec [:conf] expandVarsInForm)
+      impl (muble<>)]
      (reify Pluggable
        (setParent [_ p] (.setv impl :$parent p))
        (parent [_] (.getv impl :$parent))
@@ -311,9 +313,11 @@
 (defn IMAP "" ^Pluggable
 
   ([_] (IMAP _ (IMAPSpec)))
-  ([_ {:keys [conf] :as pspec}]
+  ([_ spec]
    (let
-     [impl (muble<>)]
+     [{:keys [conf] :as pspec}
+      (update-in spec [:conf] expandVarsInForm)
+      impl (muble<>)]
      (reify Pluggable
        (setParent [_ p] (.setv impl :$parent p))
        (parent [_] (.getv impl :$parent))

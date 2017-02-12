@@ -111,7 +111,7 @@
                          .body .content))]
     (preduce<map>
       #(let [fm (.getFieldNameLC ^ULFileItem %2)
-             fv (str %2)]
+             fv (. ^ULFileItem %2 getString)]
          (log/debug "form-field=%s, value=%s" fm fv)
          (if-some [[k v] (get props-map fm)]
            (assoc! %1 k (v fv))

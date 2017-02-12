@@ -162,9 +162,11 @@
 
   ([_] (FilePicker _ (FilePickerSpec)))
 
-  ([_ {:keys [conf] :as pspec}]
+  ([_ spec]
    (let
-     [impl (muble<>)
+     [{:keys [conf] :as pspec}
+      (update-in spec [:conf] expandVarsInForm)
+      impl (muble<>)
       sch
       #(let [_ %]
          (log/info "apache io monitor starting...")

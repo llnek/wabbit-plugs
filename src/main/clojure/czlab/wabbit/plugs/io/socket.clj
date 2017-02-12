@@ -90,11 +90,12 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn SocketIO "" ^Pluggable
-
   ([_] (SocketIO _ (SocketIOSpec)))
-  ([_ {:keys [conf] :as pspec}]
+  ([_ spec]
    (let
-     [impl (muble<>)]
+     [{:keys [conf] :as pspec}
+      (update-in spec [:conf] expandVarsInForm)
+      impl (muble<>)]
      (reify
        Pluggable
        (setParent [_ p] (.setv impl :$parent p))
