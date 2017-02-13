@@ -215,9 +215,10 @@
   ""
   [^HttpMsg evt file]
   (let
-    [^Channel ch (.socket evt)
+    [cfg (.. evt source config)
+     ^Channel ch (.socket evt)
      gist (.msgGist evt)
-     res (httpResult<> ch gist)
+     res (httpResult<> evt)
      fp (io/file file)]
     (log/debug "serving file: %s" (fpath fp))
     (try
@@ -225,16 +226,16 @@
               (not (.exists fp)))
         (do
           (.setStatus res 404)
-          (replyResult res))
+          (replyResult res cfg))
         (do
           (.setContent res fp)
-          (replyResult res)))
+          (replyResult res cfg)))
       (catch Throwable e#
         (log/error e# "get: %s" (:uri gist))
         (try!
           (.setStatus res 500)
           (.setContent res nil)
-          (replyResult res))))))
+          (replyResult res cfg))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -270,8 +271,8 @@
            (getStatic evt ffile)
            (let [ch (.socket evt)]
              (log/warn "illegal uri access: %s" fp)
-             (-> (httpResult<> ch gist 403)
-                 replyResult )))))))
+             (-> (httpResult<> evt 403)
+                 (replyResult cfg))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

@@ -131,8 +131,7 @@
   "" [^Channel ch ^HttpMsg evt]
   (try
     (->> (httpResult<>
-           (.socket evt)
-           (.msgGist evt)
+           evt
            HttpResponseStatus/INTERNAL_SERVER_ERROR)
          (.writeAndFlush ch )
          (maybeClose evt ))
@@ -287,12 +286,12 @@
   "" [^Job job error]
   ;; 500 or 503
   (let [s (or (.getv job :statusCode) 500)
-        ^HttpMsg evt (.origin job)]
+        ^HttpMsg evt (.origin job)
+        cfg (.. evt source config)]
     (-> (httpResult<>
-          (.socket evt)
-          (.msgGist evt)
+          evt
           (HttpResponseStatus/valueOf s))
-        replyResult )))
+        (replyResult cfg))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

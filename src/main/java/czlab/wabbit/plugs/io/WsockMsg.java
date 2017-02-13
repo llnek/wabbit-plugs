@@ -31,6 +31,10 @@ public interface WsockMsg extends PlugMsg {
    */
   public XData body();
 
+  /**
+   */
+  public Object socket();
+
 }
 
 

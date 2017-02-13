@@ -109,11 +109,12 @@
 
   (require 'czlab.convoy.nettio.resp)
   #(let [^HttpMsg ev (.origin ^Job %)
+         cfg (.. ev source config)
          soc (.socket ev)
-         res (httpResult<> soc (.msgGist ev))]
+         res (httpResult<> ev)]
      (.setContentType res "text/plain")
      (.setContent res "hello")
-     (replyResult res)))
+     (replyResult res cfg)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
