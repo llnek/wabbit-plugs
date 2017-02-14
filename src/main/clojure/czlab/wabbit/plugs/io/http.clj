@@ -338,9 +338,7 @@
           :errorHandler nil
           :handler nil
           :useETags? false
-          :wsock {
-            :websockPath ""
-          }
+          :wsockPath ""
           ;;:wantSession? true
           :session {
             ;;4weeks
