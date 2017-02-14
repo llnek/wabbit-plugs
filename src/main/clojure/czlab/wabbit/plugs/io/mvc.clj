@@ -245,7 +245,7 @@
       #(let
          [^HttpMsg evt (.origin ^Job %2)
           gist (.msgGist evt)
-          {:keys [publicRootDir] :as cfg}
+          {{:keys [publicRootDir]} :wsite :as cfg}
           (.. evt source config)
           homeDir (fpath (.. evt
                              source server homeDir))

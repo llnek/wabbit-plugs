@@ -37,7 +37,6 @@
   (let [eeid (str "event#" (seqint2))]
     (with-meta
       (reify TcpMsg
-        (checkAuthenticity [_] false)
         (id [_] eeid)
         (sockOut [_] (.getOutputStream socket))
         (sockIn [_] (.getInputStream socket))

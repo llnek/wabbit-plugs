@@ -120,7 +120,6 @@
   (let [eeid (str "event#" (seqint2))]
     (with-meta
       (reify MailMsg
-        (checkAuthenticity [_] false)
         (id [_] eeid)
         (source [_] co)
         (message [_] msg))

@@ -57,7 +57,6 @@
         impl (muble<>)]
     (with-meta
       (reify JmsMsg
-        (checkAuthenticity [_] false)
         (id [_] eeid)
         (source [_] co)
         (message [_] msg))

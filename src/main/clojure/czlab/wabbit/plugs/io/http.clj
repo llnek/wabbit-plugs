@@ -31,6 +31,7 @@
         [czlab.flux.wflow.core]
         [czlab.twisty.ssl]
         [czlab.basal.core]
+        [czlab.basal.io]
         [czlab.basal.str]
         [czlab.basal.meta])
 
@@ -157,7 +158,6 @@
       (reify WsockMsg
         (isBinary [_] (instBytes? (.content body')))
         (isText [_] (string? (.content body')))
-        (checkAuthenticity [_] false)
         (socket [_] ch)
         (id [_] eeid)
         (isSSL [_] ssl?)
@@ -297,28 +297,24 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- httpBasicConfig
+(defn- basicConfig
 
   "Basic http config"
   [pkey conf cfg0]
 
-  (let [{:keys [publicRootDir
-                serverKey
+  (let [{:keys [serverKey
                 port
                 passwd] :as cfg}
         (merge conf cfg0)
-        pubDir publicRootDir
-        ^String kfile serverKey
-        ssl? (hgl? kfile)]
+        ssl? (hgl? serverKey)]
     (if ssl?
       (test-cond "server-key file url"
-                 (.startsWith kfile "file:")))
+                 (. ^String serverKey startsWith "file:")))
     (->>
       {:port (if-not (spos? port) (if ssl? 443 80) port)
        :routes (maybeLoadRoutes cfg)
        :passwd (.text (passwd<> passwd pkey))
-       :publicRootDir pubDir
-       :serverKey (if ssl? (io/as-url kfile))}
+       :serverKey (if ssl? (io/as-url serverKey))}
       (merge cfg ))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -327,10 +323,11 @@
   ^:private
   httpspecdef
   {:eror :czlab.wabbit.plugs.io.http/processOrphan
-   :info {:name "HTTP Server"
+   :deps [:czlab.wabbit.plugs.auth.core/WebAuth]
+   :info {:name "Web Site"
           :version "1.0.0"}
    :conf {:maxInMemory (* 1024 1024 4)
-          :$pluggable ::HTTP
+          :$pluggable ::WebMVC
           :maxContentSize -1
           :waitMillis 0
           :sockTimeOut 0
@@ -338,8 +335,35 @@
           :port 9090
           :serverKey ""
           :passwd ""
+          :errorHandler nil
           :handler nil
-          :routes nil}})
+          :useETags? false
+          :wsock {
+            :websockPath ""
+          }
+          ;;:wantSession? true
+          :session {
+            ;;4weeks
+            :maxAgeSecs 2419200
+            ;;1week
+            :maxIdleSecs 604800
+            :isHidden? true
+            :sslOnly? false
+            :macit? false
+            :domain ""
+            :domainPath "/"
+          }
+          :wsite {
+            :publicRootDir "${pod.dir}/public"
+            :mediaDir "res"
+            :pageDir "htm"
+            :jsDir "jsc"
+            :cssDir "css"
+          }
+          :routes
+          [{:mount "res/{}" :uri "/(favicon\\..+)"}
+           {:mount "{}" :uri "/public/(.*)"}
+           {:uri "/?" :template  "main/index.html"}]}})
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -356,93 +380,20 @@
       (spec [_] pspec)
       (init [this arg]
         (let [^Pluglet pg (.parent this)
-              k (.. pg server pkey)]
-          (.copyEx impl
-                   (httpBasicConfig k conf arg))))
-      (start [this _]
-        (let [[bs ch] (boot! (.parent this))]
-          (.setv impl :$boot bs)
-          (.setv impl :$chan ch)))
-      (stop [_]
-        (when-some
-          [c (.unsetv impl :$chan)]
-          (stopServer c))
-        (.unsetv impl :$boot)))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-(def
-  ^:private
-  mvcspecdef
-  {:eror :czlab.wabbit.plugs.io.http/processOrphan
-   :deps [:czlab.wabbit.plugs.auth.core/WebAuth]
-   :info {:name "Web Site"
-          :version "1.0.0"}
-   :conf {:maxInMemory (* 1024 1024 4)
-          :$pluggable ::WebMVC
-          :maxContentSize -1
-          :waitMillis 0
-          :sockTimeOut 0
-          :host ""
-          :port 9090
-          :serverKey ""
-          :passwd ""
-          ;;:wantSession? true
-          :session {
-            ;;30days
-            ;;:maxAgeSecs 2592000
-            ;;4weeks
-            :maxAgeSecs 2419200
-            ;;:isSecure? true
-            ;;1week
-            :maxIdleSecs 604800
-            :isHidden? true
-            :sslOnly? false
-            :macit? false
-            :domain ""
-            :domainPath "/"
-          }
-          :wsock {
-            :websockPath ""
-          }
-          :useETags? false
-          :errorHandler nil
-          :handler nil
-          :publicRootDir "${pod.dir}/public"
-          :mediaDir "res"
-          :pageDir "htm"
-          :jsDir "jsc"
-          :cssDir "css"
-          :routes
-          [{:mount "res/{}" :uri "/(favicon\\..+)"}
-           {:mount "{}" :uri "/public/(.*)"}
-           {:uri "/?" :template  "main/index.html"}]}})
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-(defn- httpMVC<>
-  "" [{:keys [conf] :as pspec}]
-
-  (let
-    [impl (muble<>)]
-    (reify Pluggable
-      (setParent [_ p] (.setv impl :$parent p))
-      (parent [_] (.getv impl :$parent))
-      (config [_] (dissoc (.intern impl)
-                          :$parent :$boot :$chan))
-      (spec [_] pspec)
-      (init [this arg]
-        (let [^Pluglet pg (.parent this)
               h (.. pg server homeDir)
               k (.. pg server pkey)
-              {:keys [publicRootDir pageDir] :as cfg}
-              (httpBasicConfig k conf arg)
-              root (io/file publicRootDir pageDir)]
-          (log/debug "freemarker tpl root: %s" (fpath root))
+              {{:keys [publicRootDir pageDir]}
+               :wsite
+               :as cfg}
+              (basicConfig k conf arg)
+              pub (io/file (str publicRootDir)
+                           (str pageDir))]
           (.copyEx impl cfg)
-          (.setv impl
-                 :$ftlCfg
-                 (mvc/genFtlConfig {:root root}))))
+          (when (dirRead? pub)
+            (log/debug "freemarker tpl root: %s" (fpath pub))
+            (.setv impl
+                   :$ftlCfg
+                   (mvc/genFtlConfig {:root pub})))))
       (start [this _]
         (let [[bs ch] (boot! (.parent this))]
           (.setv impl :$boot bs)
@@ -452,16 +403,6 @@
           [c (.unsetv impl :$chan)]
           (stopServer c))
         (.unsetv impl :$boot)))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-(defn WebMVCSpec "" ^APersistentMap [] mvcspecdef)
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-(defn WebMVC "" ^Pluggable
-  ([_] (WebMVC _ (WebMVCSpec)))
-  ([_ spec] (httpMVC<> (update-in spec [:conf] expandVarsInForm))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

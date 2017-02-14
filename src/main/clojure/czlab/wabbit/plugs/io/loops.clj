@@ -123,7 +123,6 @@
     (with-meta
       (reify
         TimerMsg
-        (checkAuthenticity [_] false)
         (id [_] eeid)
         (source [_] co)
         (isRepeating [_] repeat?))

@@ -51,7 +51,6 @@
      f (io/file fp)]
     (with-meta
       (reify FileMsg
-        (checkAuthenticity [_] false)
         (originalFileName [_] fname)
         (source [_] co)
         (file [_] f)

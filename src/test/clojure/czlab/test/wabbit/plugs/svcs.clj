@@ -122,7 +122,7 @@
 
   (is (do->true (sysProp! "wabbit.user.dir" (fpath *tempfile-repo*))))
 
-  (is (let [etype :czlab.wabbit.plugs.io.http/WebMVC
+  (is (let [etype :czlab.wabbit.plugs.io.http/HTTP
             ctr (mocker :exec)
             dir (sysProp "wabbit.user.dir")
             s (plugletViaType<> ctr etype "t")]
@@ -144,7 +144,7 @@
           (.dispose s)
           (.dispose ctr)
           (= "hello" z))))
-
+(pause 11111)
   (is (let [_ (sysProp! "wabbit.mock.mail.proto" "imaps")
             etype :czlab.wabbit.plugs.io.mails/IMAP
             ctr (mocker :exec)
