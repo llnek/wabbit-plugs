@@ -98,7 +98,6 @@
     (setTrigger [_ arg] )
     (cancel [_] )
     (body [_] )
-    (checkSession [_] false)
     (cookie [_ n] )
     (cookies [_] )
     (isSSL [_] false)

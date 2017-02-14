@@ -174,27 +174,21 @@
     [^InetSocketAddress laddr (.localAddress ch)
      body' (.content req)
      gist (.msgGist req)
-     {:keys [isSecure? wantSession?]}
+     {:keys [wantSession? session]}
      (.config co)
      ^RouteInfo
      ri (get-in gist [:route :info])
      eeid (str "event#" (seqint2))
      cookieJar (:cookies gist)
-     ws? (or (true? wantSession?)
-             (and (!false? wantSession?)
-                  (some-> ri .wantSession)))
-     se? (or (true? isSecure?)
-             (and (!false? isSecure?)
-                  (some-> ri .isSecure)))
      pkey (.. co server pkeyBytes)
-     wss (if ws? (upstream pkey cookieJar se?))
+     wss (if wantSession?
+           (->> (:macit? session)
+                (upstream pkey cookieJar)))
      impl (muble<> {:$session wss :$stale? false})]
     (with-meta
       (reify HttpMsg
 
         (session [_] (.getv impl :$session))
-        (checkAuthenticity [_] se?)
-        (checkSession [_] ws?)
         (id [_] eeid)
         (source [_] co)
         (socket [_] ch)
@@ -393,15 +387,24 @@
           :port 9090
           :serverKey ""
           :passwd ""
-          :sessionAgeSecs 2592000
           ;;:wantSession? true
-          ;;:isSecure? true
-          :maxIdleSecs 0
-          :hidden true
-          :websockPath ""
-          :domain ""
-          :domainPath "/"
-          :maxAgeSecs 3600
+          :session {
+            ;;30days
+            ;;:maxAgeSecs 2592000
+            ;;4weeks
+            :maxAgeSecs 2419200
+            ;;:isSecure? true
+            ;;1week
+            :maxIdleSecs 604800
+            :isHidden? true
+            :sslOnly? false
+            :macit? false
+            :domain ""
+            :domainPath "/"
+          }
+          :wsock {
+            :websockPath ""
+          }
           :useETags? false
           :errorHandler nil
           :handler nil
