@@ -217,7 +217,7 @@
   (let
     [cfg (.. evt source config)
      ^Channel ch (.socket evt)
-     gist (.msgGist evt)
+     gist (.gist evt)
      res (httpResult<> evt)
      fp (io/file file)]
     (log/debug "serving file: %s" (fpath fp))
@@ -244,7 +244,7 @@
     (script<>
       #(let
          [^HttpMsg evt (.origin ^Job %2)
-          gist (.msgGist evt)
+          gist (.gist evt)
           {{:keys [publicRootDir]} :wsite :as cfg}
           (.. evt source config)
           homeDir (fpath (.. evt

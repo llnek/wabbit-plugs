@@ -104,7 +104,7 @@
     (localAddr [_] "")
     (localHost [_] "")
     (localPort [_] 0)
-    (msgGist [_] )
+    (gist [_] )
     (remoteAddr [_] )
     (remoteHost [_] "")
     (remotePort [_] 0)

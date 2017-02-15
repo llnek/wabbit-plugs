@@ -140,7 +140,7 @@
 (defn- crackParams
   "Parse form fields in the Url"
   [^HttpMsg evt]
-  (let [gist (.msgGist evt)]
+  (let [gist (.gist evt)]
     (preduce<map>
       #(let [[k [a1 a2]] props-map]
          (if (gistParam? gist k)
@@ -156,7 +156,7 @@
   "Attempt to parse and get authentication info"
   ^APersistentMap
   [^HttpMsg evt]
-  (let [gist (.msgGist evt)]
+  (let [gist (.gist evt)]
     (if-some+
       [ct (gistHeader gist "content-type")]
       (cond

@@ -110,7 +110,7 @@
   "Scan and parse if exists basic authentication"
   ^APersistentMap
   [^HttpMsg evt]
-  (if-some+ [v (-> (.msgGist evt)
+  (if-some+ [v (-> (.gist evt)
                    (gistHeader auth-token))]
     (parseBasicAuth v)))
 
@@ -124,7 +124,7 @@
 ;;
 (defn- maybeClose
   "" [^HttpMsg evt ^ChannelFuture cf]
-  (closeCF cf (:isKeepAlive? (.msgGist evt))))
+  (closeCF cf (:isKeepAlive? (.gist evt))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -173,13 +173,13 @@
   (let
     [^InetSocketAddress laddr (.localAddress ch)
      body' (.content req)
-     gist (.msgGist req)
+     gs (.gist req)
      {:keys [wantSession? session]}
      (.config co)
      ^RouteInfo
-     ri (get-in gist [:route :info])
+     ri (get-in gs [:route :info])
      eeid (str "event#" (seqint2))
-     cookieJar (:cookies gist)
+     cookieJar (:cookies gs)
      pkey (.. co server pkeyBytes)
      wss (if wantSession?
            (->> (:macit? session)
@@ -194,11 +194,11 @@
         (socket [_] ch)
 
         ;;:route {:redirect :status? :info :groups :places}
-        (routeGist [_] (:route gist))
+        (routeGist [_] (:route gs))
 
         (cookie [_ n] (get cookieJar n))
         (cookies [_] (vals cookieJar))
-        (msgGist [_] gist)
+        (gist [_] gs)
         (body [_] body')
 
         (localAddr [_] (.. laddr getAddress getHostAddress))
@@ -206,16 +206,16 @@
         (localPort [_] (. laddr getPort))
 
         (remotePort [_]
-          (convLong (gistHeader gist "remote_port") 0))
+          (convLong (gistHeader gs "remote_port") 0))
         (remoteAddr [_]
-          (str (gistHeader gist "remote_addr")))
+          (str (gistHeader gs "remote_addr")))
         (remoteHost [_]
-          (str (gistHeader gist "remote_host")))
+          (str (gistHeader gs "remote_host")))
 
         (serverPort [_]
-          (convLong (gistHeader gist "server_port") 0))
+          (convLong (gistHeader gs "server_port") 0))
         (serverName [_]
-          (str (gistHeader gist "server_name")))
+          (str (gistHeader gs "server_name")))
 
         (setTrigger [_ t] (.setv impl :$trigger t))
         (cancel [_]
@@ -228,9 +228,9 @@
             (cancelTimerTask t)
             (resumeOnExpiry ch this)))
 
-        (scheme [_] (if (:ssl? gist) "https" "http"))
+        (scheme [_] (if (:ssl? gs) "https" "http"))
         (isStale [_] (.getv impl :$stale?))
-        (isSSL [_] (:ssl? gist))
+        (isSSL [_] (:ssl? gs))
         (getx [_] impl))
 
       {:typeid ::HTTPMsg})))
