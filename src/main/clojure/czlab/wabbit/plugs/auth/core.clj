@@ -244,7 +244,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn assertPluginOK
+(defn- assertPluginOK
 
   "If the plugin has been initialized,
    by looking into the db"
@@ -255,8 +255,10 @@
                  (.get ^Schema *auth-meta-cache*)
                  dbtable)]
     (when-not (tableExist? pool tbl)
-      (dberr! (rstr (I18N/base)
-                    "auth.no.table" tbl)))))
+      (applyDDL pool)
+      (if-not (tableExist? pool tbl)
+        (dberr! (rstr (I18N/base)
+                      "auth.no.table" tbl))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -640,12 +642,11 @@
       (getx [_] impl)
 
       (init [_ arg]
-        (applyDDL (.dftDbPool ctr)))
-
-      (start [_ _]
         (assertPluginOK (.dftDbPool ctr))
         (initShiro (.homeDir ctr)
-                   (.pkey ctr))
+                   (.pkey ctr)))
+
+      (start [_ _]
         (log/info "AuthPluglet started"))
 
       (stop [_]

@@ -54,13 +54,10 @@
         ;;pwd (.getCredentials token)
         user (.getPrincipal token)
         sql (.simpleSQLr db)]
-    (try
-      (when-some [acc (findLoginAccount sql user)]
-        (SimpleAccount. acc
-                        (:passwd acc)
-                        (.getName this)))
-      (finally
-        (.finz db)))))
+    (when-some [acc (findLoginAccount sql user)]
+      (SimpleAccount. acc
+                      (:passwd acc)
+                      (.getName this)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -74,13 +71,10 @@
                            (.getName this))
         sql (.simpleSQLr db)
         j :czlab.wabbit.auth.model/AccountRoles]
-    (try
-      (let [rs (dbGetM2M {:joined j :with sql} acc) ]
-        (doseq [r rs]
-          (.addRole rc ^String (:name r)))
-        rc)
-      (finally
-        (.finz db)))))
+    (let [rs (dbGetM2M {:joined j :with sql} acc) ]
+      (doseq [r rs]
+        (.addRole rc ^String (:name r)))
+      rc)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
