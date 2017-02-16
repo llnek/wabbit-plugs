@@ -15,10 +15,11 @@
 
   (:require [czlab.basal.format :refer [readEdn readJsonStr writeJsonStr]]
             [czlab.twisty.codec :refer [caesarDecrypt passwd<>]]
-            [czlab.convoy.net.util :refer [filterFormFields]]
+            [czlab.convoy.net.util :refer [generateCsrf filterFormFields]]
             [czlab.wabbit.plugs.io.http :refer [scanBasicAuth]]
-            [czlab.horde.dbio.connect :refer [dbopen<+>]]
+            [czlab.horde.dbio.connect :refer [dbapi<>]]
             [czlab.basal.resources :refer [rstr]]
+            [czlab.convoy.net.wess :as wss]
             [clojure.string :as cs]
             [clojure.java.io :as io]
             [czlab.basal.logging :as log])
@@ -56,6 +57,7 @@
             AuthenticationToken
             AuthenticationInfo]
            [czlab.twisty IPassword]
+           [java.net HttpCookie]
            [java.util Properties]
            [czlab.flux.wflow
             BoolExpr
@@ -87,7 +89,7 @@
 
 ;; hard code the shift position, the encrypt code
 ;; should match this value.
-(def ^:private caesar-shift 16)
+(def ^:private caesar-shift 13)
 
 (def ^:private props-map
   {email-param [ :email #(normalizeEmail %) ]
@@ -99,6 +101,32 @@
 
 (def ^:dynamic *meta-cache* nil)
 (def ^:dynamic *jdbc-pool* nil)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+(defn newSession<> "" [^HttpMsg evt attrs]
+
+  (let
+    [s (wss/wsession<> (.. evt source server pkeyBytes)
+                       (:session (.. evt source config)))]
+    (doseq [[k v] attrs] (.setAttr s k v))
+    s))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+(defn csrfToken<> "Create or delete a csrf cookie"
+
+  ;; if maxAge=-1, browser doesnt sent it back!
+  [{:keys [domainPath domain]} token]
+
+  (let [ok? (hgl? token)
+        c (HttpCookie. wss/csrf-cookie
+                       (if ok? token "*"))]
+    (if (hgl? domainPath) (.setPath c domainPath))
+    (if (hgl? domain) (.setDomain c domain))
+    (.setHttpOnly c true)
+    (. c setMaxAge (if ok? 3600 0))
+    c))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -238,7 +266,7 @@
   ([^Execvisor ctr tx?]
    {:pre [(some? ctr)]}
    (let [db (-> (.dftDbPool ctr)
-                (dbopen<+> *auth-meta-cache*))]
+                (dbapi<> *auth-meta-cache*))]
      (if tx?
        (.compositeSQLr db)
        (.simpleSQLr db)))))
@@ -483,111 +511,110 @@
 (defn signupTestExpr<>
 
   "Test component of a standard sign-up workflow"
-  ^BoolExpr
-  [^String challengeStr]
+  [^String challengeStr ^Job job]
 
-  (reify BoolExpr
-    (ptest [_ job]
-      (let
-        [^HttpMsg evt (.origin job)
-         csrf (.. evt session xref)
-         info (try
-                (getSignupInfo evt)
-                (catch BadDataError _ {:e _}))
-         info (or info {})
-         rb (I18N/base)
-         ^AuthPluglet
-         pa (-> ^Muble (.. evt source server getx)
-                (.getv :plugins)
-                (:auth ))]
-        (log/debug "session csrf = %s%s%s"
-                   csrf ", and form token = " (:csrf info))
-        (cond
-          (some? (:e info))
-          (do->false
-            (->> {:error (exp! AuthError
-                               ""
-                               (cexp? (:e info)))}
-                 (.setLastResult job)))
+  (let
+    [^HttpMsg evt (.origin job)
+     ck (.cookie evt
+                 wss/csrf-cookie)
+     csrf (some-> ck .getValue)
+     info (try
+            (getSignupInfo evt)
+            (catch BadDataError _ {:e _}))
+     info (or info {})
+     rb (I18N/base)
+     ^AuthPluglet
+     pa (-> (.. evt source server)
+            (.child :$auth))]
+    (log/debug "csrf = %s%s%s"
+               csrf ", and form parts = " info)
+    (test-some "auth-pluglet" pa)
+    (cond
+      (some? (:e info))
+      (do->false
+        (->> {:error (exp! AuthError
+                           ""
+                           (cexp? (:e info)))}
+             (.setLastResult job)))
 
-          (and (hgl? challengeStr)
-               (not= challengeStr (:captcha info)))
-          (do->false
-            (->> {:error (exp! AuthError
-                               (rstr rb "auth.bad.cha"))}
-                 (.setLastResult job)))
+      (and (hgl? challengeStr)
+           (not= challengeStr (:captcha info)))
+      (do->false
+        (->> {:error (exp! AuthError
+                           (rstr rb "auth.bad.cha"))}
+             (.setLastResult job)))
 
-          (not= csrf (:csrf info))
-          (do->false
-            (->> {:error (exp! AuthError
-                               (rstr rb "auth.bad.tkn"))}
-                 (.setLastResult job)))
+      (not= csrf (:csrf info))
+      (do->false
+        (->> {:error (exp! AuthError
+                           (rstr rb "auth.bad.tkn"))}
+             (.setLastResult job)))
 
-          (and (hgl? (:credential info))
-               (hgl? (:principal info))
-               (hgl? (:email info)))
-          (if (.hasAccount pa info)
-            (do->false
-              (->> {:error (exp! DuplicateUser
-                                 (str (:principal info)))}
-                   (.setLastResult job )))
-            (do->true
-              (->> {:account (.addAccount pa info)}
-                   (.setLastResult job))))
+      (and (hgl? (:credential info))
+           (hgl? (:principal info))
+           (hgl? (:email info)))
+      (if (.hasAccount pa info)
+        (do->false
+          (->> {:error (exp! DuplicateUser
+                             (str (:principal info)))}
+               (.setLastResult job )))
+        (do->true
+          (->> {:account (.addAccount pa info)}
+               (.setLastResult job))))
 
-          :else
-          (do->false
-            (->> {:error (exp! AuthError
-                               (rstr rb "auth.bad.req"))}
-                 (.setLastResult job))))))))
+      :else
+      (do->false
+        (->> {:error (exp! AuthError
+                           (rstr rb "auth.bad.req"))}
+             (.setLastResult job))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn loginTestExpr<> "" ^BoolExpr []
-  (reify BoolExpr
-    (ptest [_ job]
-      (let
-        [^HttpMsg evt (.origin job)
-         csrf (.. evt session xref)
-         info (try
-                (getSignupInfo evt)
-                (catch BadDataError _ {:e _}))
-         info (or info {})
-         rb (I18N/base)
-         ^AuthPluglet
-         pa (-> ^Muble
-                (.. evt source server getx)
-                (.getv :plugins)
-                (:auth ))]
-        (log/debug "session csrf = %s%s%s"
-                   csrf
-                   ", and form token = " (:csrf info))
-        (cond
-          (some? (:e info))
-          (do->false
-            (->> {:error (exp! AuthError
-                               (cexp? (:e info)))}
-                 (.setLastResult job)))
+(defn loginTestExpr<> "" [^Job job]
 
-          (not= csrf (:csrf info))
-          (do->false
-            (->> {:error (exp! AuthError
-                               (rstr rb "auth.bad.tkn"))}
-                 (.setLastResult job)))
+  (let
+    [^HttpMsg evt (.origin job)
+     ck (.cookie evt
+                 wss/csrf-cookie)
+     csrf (some-> ck .getValue)
+     info (try
+            (getSignupInfo evt)
+            (catch BadDataError _ {:e _}))
+     info (or info {})
+     rb (I18N/base)
+     ^AuthPluglet
+     pa (-> (.. evt source server)
+            (.child :$auth))]
+    (log/debug "csrf = %s%s%s"
+               csrf ", and form parts = " info)
+    (test-some "auth-pluglet" pa)
+    (cond
+      (some? (:e info))
+      (do->false
+        (->> {:error (exp! AuthError
+                           ""
+                           (cexp? (:e info)))}
+             (.setLastResult job)))
 
-          (and (hgl? (:credential info))
-               (hgl? (:principal info)))
-          (do
-            (->> {:account (.login pa (:principal info)
-                                      (:credential info))}
-                 (.setLastResult job))
-            (some? (:account (.lastResult job))))
+      (not= csrf (:csrf info))
+      (do->false
+        (->> {:error (exp! AuthError
+                           (rstr rb "auth.bad.tkn"))}
+             (.setLastResult job)))
 
-          :else
-          (do->false
-            (->> {:error (exp! AuthError
-                               (rstr rb "auth.bad.req"))}
-                 (.setLastResult job))))))))
+      (and (hgl? (:credential info))
+           (hgl? (:principal info)))
+      (do
+        (->> {:account (.login pa (:principal info)
+                               (:credential info))}
+             (.setLastResult job))
+        (some? (:account (.lastResult job))))
+
+      :else
+      (do->false
+        (->> {:error (exp! AuthError
+                           (rstr rb "auth.bad.req"))}
+             (.setLastResult job))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -595,10 +622,9 @@
 
   ""
   ^AuthPluglet
-  [^Execvisor ctr]
+  [^Execvisor ctr pid]
 
-  (let [pid (str "auth#" (seqint2))
-        impl (muble<>)]
+  (let [impl (muble<>)]
     (reify AuthPluglet
 
       (isEnabled [this]
@@ -681,7 +707,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn WebAuth "" ^AuthPluglet [ctr] (authPluglet<> ctr))
+(defn WebAuth "" ^AuthPluglet [ctr id] (authPluglet<> ctr id))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

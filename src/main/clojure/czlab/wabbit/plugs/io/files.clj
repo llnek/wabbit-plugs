@@ -159,9 +159,9 @@
 ;;
 (defn FilePicker "" ^Pluggable
 
-  ([_] (FilePicker _ (FilePickerSpec)))
+  ([_ id] (FilePicker _ id (FilePickerSpec)))
 
-  ([_ spec]
+  ([_ id spec]
    (let
      [{:keys [conf] :as pspec}
       (update-in spec [:conf] expandVarsInForm)

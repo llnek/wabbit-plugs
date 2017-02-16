@@ -89,8 +89,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn SocketIO "" ^Pluggable
-  ([_] (SocketIO _ (SocketIOSpec)))
-  ([_ spec]
+  ([_ id] (SocketIO _ id (SocketIOSpec)))
+  ([_ id spec]
    (let
      [{:keys [conf] :as pspec}
       (update-in spec [:conf] expandVarsInForm)

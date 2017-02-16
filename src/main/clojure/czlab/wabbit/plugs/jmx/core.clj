@@ -122,13 +122,12 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- jmsPluglet<>
-  "" ^JmxPluglet [^Execvisor ctr]
+  "" ^JmxPluglet [^Execvisor ctr pid]
   (let
     [impl (muble<> {:registryPort 7777
                     :serverPort 7778
                     :host (-> (InetAddress/getLocalHost)
                               .getHostName)})
-     pid (str "jmx#" (seqint2))
      objNames (atom [])]
     (reify JmxPluglet
 
@@ -193,7 +192,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn JmxMonitor "" ^JmxPluglet [ctr] (jmsPluglet<> ctr))
+(defn JmxMonitor "" ^JmxPluglet [ctr id] (jmsPluglet<> ctr id))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF

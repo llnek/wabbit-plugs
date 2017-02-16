@@ -323,11 +323,10 @@
   ^:private
   httpspecdef
   {:eror :czlab.wabbit.plugs.io.http/processOrphan
-   :deps [:czlab.wabbit.plugs.auth.core/WebAuth]
    :info {:name "Web Site"
           :version "1.0.0"}
    :conf {:maxInMemory (* 1024 1024 4)
-          :$pluggable ::WebMVC
+          :$pluggable ::HTTP
           :maxContentSize -1
           :waitMillis 0
           :sockTimeOut 0
@@ -348,6 +347,7 @@
             :isHidden? true
             :sslOnly? false
             :macit? false
+            :webAuth? true
             :domain ""
             :domainPath "/"
           }
@@ -375,19 +375,27 @@
       (parent [_] (.getv impl :$parent))
       (config [_] (dissoc (.intern impl)
                           :$parent :$boot :$chan))
-      (spec [_] pspec)
+      (spec [_] (.getv impl :$pspec))
       (init [this arg]
         (let [^Pluglet pg (.parent this)
               h (.. pg server homeDir)
               k (.. pg server pkey)
               {{:keys [publicRootDir pageDir]}
                :wsite
+               {:keys [webAuth?]}
+               :session
                :as cfg}
               (basicConfig k conf arg)
               pub (io/file (str publicRootDir)
                            (str pageDir))]
           (.copyEx impl cfg)
-          (when (dirRead? pub)
+          (->> (if webAuth?
+                 (assoc pspec
+                        :deps
+                        {:$auth [:czlab.wabbit.plugs.auth.core/WebAuth]})
+                 pspec)
+               (.setv impl :$pspec))
+          (when (dirReadWrite? pub)
             (log/debug "freemarker tpl root: %s" (fpath pub))
             (.setv impl
                    :$ftlCfg
@@ -409,8 +417,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn HTTP "" ^Pluggable
-  ([_] (HTTP _ (HTTPSpec)))
-  ([_ spec] (httpXXX<> (update-in spec [:conf] expandVarsInForm))))
+  ([_ id] (HTTP _ id (HTTPSpec)))
+  ([_ id spec]
+   (httpXXX<> (update-in spec [:conf] expandVarsInForm))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF

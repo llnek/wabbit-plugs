@@ -242,8 +242,8 @@
 ;;
 (defn JMS "" ^Pluggable
 
-  ([_] (JMS _ (JMSSpec)))
-  ([_ spec]
+  ([_ id] (JMS _ id (JMSSpec)))
+  ([_ id spec]
    (let
      [{:keys [conf] :as pspec}
       (update-in spec [:conf] expandVarsInForm)

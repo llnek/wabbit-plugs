@@ -226,16 +226,16 @@
               (not (.exists fp)))
         (do
           (.setStatus res 404)
-          (replyResult res cfg))
+          (replyResult res))
         (do
           (.setContent res fp)
-          (replyResult res cfg)))
+          (replyResult res)))
       (catch Throwable e#
         (log/error e# "get: %s" (:uri gist))
         (try!
           (.setStatus res 500)
           (.setContent res nil)
-          (replyResult res cfg))))))
+          (replyResult res))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -272,7 +272,7 @@
            (let [ch (.socket evt)]
              (log/warn "illegal uri access: %s" fp)
              (-> (httpResult<> evt 403)
-                 (replyResult cfg))))))))
+                 (replyResult ))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

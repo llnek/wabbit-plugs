@@ -237,8 +237,8 @@
 ;;
 (defn POP3 "" ^Pluggable
 
-  ([_] (POP3 _ (POP3Spec)))
-  ([_ spec]
+  ([_ id] (POP3 _ id (POP3Spec)))
+  ([_ id spec]
    (let
      [{:keys [conf] :as pspec}
       (update-in spec [:conf] expandVarsInForm)
@@ -311,8 +311,8 @@
 ;;
 (defn IMAP "" ^Pluggable
 
-  ([_] (IMAP _ (IMAPSpec)))
-  ([_ spec]
+  ([_ id] (IMAP _ id (IMAPSpec)))
+  ([_ id spec]
    (let
      [{:keys [conf] :as pspec}
       (update-in spec [:conf] expandVarsInForm)
