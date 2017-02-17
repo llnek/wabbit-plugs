@@ -181,7 +181,9 @@
      eeid (str "event#" (seqint2))
      cookieJar (:cookies gs)
      pkey (.. co server pkeyBytes)
-     wss (if wantSession?
+     s? (and (!false? wantSession?)
+             (some-> ri .wantSession))
+     wss (if s?
            (->> (:macit? session)
                 (upstream pkey cookieJar)))
      impl (muble<> {:$session wss :$stale? false})]
