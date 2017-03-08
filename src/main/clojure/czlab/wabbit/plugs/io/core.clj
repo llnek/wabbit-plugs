@@ -15,13 +15,12 @@
             [czlab.basal.logging :as log])
 
   (:use [czlab.wabbit.base.core]
-        [czlab.basal.consts]
         [czlab.basal.core]
         [czlab.basal.str]
         [czlab.flux.wflow.core])
 
   (:import [czlab.wabbit.ctl Pluggable Pluglet PlugMsg]
-           [czlab.flux.wflow WorkStream Job TaskDef]
+           [czlab.flux.wflow WorkStream Job Activity]
            [czlab.jasal Triggerable]
            [java.util Timer TimerTask]))
 
@@ -82,10 +81,10 @@
        (log/debug "job#%s => %s" (.id job) (.id src))
        (do->nil
          (cond
-           (inst? WorkStream wf)
+           (ist? WorkStream wf)
            (.execWith ^WorkStream wf job)
            (fn? wf)
-           (doto (workStream<>
+           (doto (workstream<>
                    (script<> #(wf %2) nil))
              (.execWith job))
            :else

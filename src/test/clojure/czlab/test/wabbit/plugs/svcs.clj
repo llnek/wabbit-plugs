@@ -58,7 +58,7 @@
          (.. e source config)
          tp (fpath targetFolder)
          rp (fpath recvFolder)
-         nm (juid)
+         nm (jid<>)
          f (.file e)
          fp (fpath f)
          s (slurpUtf8 f)
@@ -114,7 +114,7 @@
          res (httpResult<> ev)]
      (.setContentType res "text/plain")
      (.setContent res "hello")
-     (replyResult res cfg)))
+     (replyResult res)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -303,7 +303,7 @@
             root *tempfile-repo*
             from (str root "/from")
             to (str root "/to")
-            firstfn (str from "/" (juid))
+            firstfn (str from "/" (jid<>))
             c {:targetFolder from
                :recvFolder to
                :fmask ""

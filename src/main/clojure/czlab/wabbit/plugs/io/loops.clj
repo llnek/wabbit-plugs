@@ -41,7 +41,7 @@
      [dw ds] delays]
     (if (spos? intv)
       (cond
-        (inst? Date dw)
+        (ist? Date dw)
         (.schedule timer tt ^Date dw intv)
         :else
         (.schedule timer
@@ -59,7 +59,7 @@
     [tt (tmtask<> func)
      [dw ds] delays]
     (cond
-      (inst? Date dw)
+      (ist? Date dw)
       (.schedule timer tt ^Date dw)
       :else
       (.schedule timer
@@ -108,7 +108,7 @@
             func #(schedule {:intervalMillis
                             (s2ms intervalSecs)})]
            (if (or (spos? delaySecs)
-                   (inst? Date delayWhen))
+                   (ist? Date delayWhen))
              (configOnce (Timer.)
                          [delayWhen (s2ms delaySecs)] func)
              (func))))

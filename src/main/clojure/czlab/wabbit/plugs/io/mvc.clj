@@ -20,7 +20,6 @@
         [czlab.wabbit.base.core]
         [czlab.convoy.net.core]
         [czlab.convoy.net.wess]
-        [czlab.basal.consts]
         [czlab.basal.core]
         [czlab.basal.io]
         [czlab.basal.str]
@@ -240,7 +239,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (def ^:private asset-handler
-  (workStream<>
+  (workstream<>
     (script<>
       #(let
          [^HttpMsg evt (.origin ^Job %2)

@@ -24,7 +24,7 @@
         [czlab.horde.dbddl.mysql]
         [czlab.horde.dbddl.oracle])
 
-  (:import [czlab.horde JdbcInfo JdbcPool Schema]
+  (:import [czlab.horde JdbcSpec JdbcPool Schema]
            [java.sql Connection]
            [java.io File]
            [czlab.jasal I18N]))
@@ -64,7 +64,7 @@
           ;;:salt { :size 128}
          :passwd {:null false :domain :Password}})
       (dbassocs
-        {:addr {:kind :O2O
+        {:addr {:kind :o2o
                 :cascade true
                 :other ::StdAddress}})
       (dbuniques
@@ -81,7 +81,7 @@
   {:pre [(keyword? spec)]}
 
   (if (contains? *db-types* spec)
-    (getDDL *auth-meta-cache* spec)
+    (getDdl *auth-meta-cache* spec)
     (dberr! (rstr (I18N/base) "db.unknown" (name spec)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -92,7 +92,7 @@
 ;;
 (extend-protocol PlugletDDL
 
-  JdbcInfo
+  JdbcSpec
   (applyDDL [this]
     (when-some [t (matchUrl (.url this))]
       (with-open [c (dbconnect<> this)]

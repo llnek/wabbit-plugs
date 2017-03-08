@@ -37,7 +37,7 @@
 
   (let
     [rts (Cljshim/newrt (getCldr) "mock")
-     pid (juid)
+     pid (jid<>)
      cpu (scheduler<> pid)
      impl (muble<> {:plugs {}})]
     (with-meta
@@ -45,8 +45,8 @@
         Execvisor
 
         (homeDir [_] (io/file (sysProp "wabbit.user.dir")))
-        (pkeyBytes [this] (bytesify (.pkey this)))
-        (pkey [_] "hello world")
+        (pkeyBytes [this] (bytesify "hello world"))
+        (pkey [_] (.toCharArray "hello world"))
         (cljrt [_] rts)
 
         (getx [_] impl)

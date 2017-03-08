@@ -91,7 +91,7 @@
               jmsUser
               (stror pwd nil))
             (.createConnection cf))]
-    (if (inst? Destination c)
+    (if (ist? Destination c)
       ;;TODO ? ack always ?
       (-> (.createSession conn false Session/CLIENT_ACKNOWLEDGE)
           (.createConsumer c)
@@ -126,10 +126,10 @@
      s (.createTopicSession
          conn false Session/CLIENT_ACKNOWLEDGE)
      t (.lookup ctx destination)]
-    (if-not (inst? Topic t)
+    (if-not (ist? Topic t)
       (throwIOE "Object not of Topic type"))
     (-> (if durable?
-          (.createDurableSubscriber s t (juid))
+          (.createDurableSubscriber s t (jid<>))
           (.createSubscriber s t))
         (.setMessageListener
           (reify MessageListener
@@ -160,7 +160,7 @@
      s (.createQueueSession conn
                             false Session/CLIENT_ACKNOWLEDGE)
      q (.lookup ctx destination)]
-    (if-not (inst? Queue q)
+    (if-not (ist? Queue q)
       (throwIOE "Object not of Queue type"))
     (-> (.createReceiver s ^Queue q)
         (.setMessageListener

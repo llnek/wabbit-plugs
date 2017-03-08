@@ -242,7 +242,7 @@
 (defn- evt<>
   "" [co {:keys [ch msg]}]
   (if
-    (inst? WebSocketFrame msg)
+    (ist? WebSocketFrame msg)
     (wsockEvent<> co ch msg)
     (httpEvent<> co ch msg)))
 

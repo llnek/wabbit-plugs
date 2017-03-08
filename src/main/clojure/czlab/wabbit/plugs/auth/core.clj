@@ -59,12 +59,7 @@
            [czlab.twisty IPassword]
            [java.net HttpCookie]
            [java.util Properties]
-           [czlab.flux.wflow
-            BoolExpr
-            TaskDef
-            If
-            Job
-            Script]
+           [czlab.flux.wflow Activity Job]
            [czlab.wabbit.plugs.auth
             AuthPluglet
             UnknownUser
@@ -75,7 +70,7 @@
             Schema
             SQLr
             JdbcPool
-            JdbcInfo]))
+            JdbcSpec]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;(set! *warn-on-reflection* true)
