@@ -29,7 +29,7 @@
            [javax.mail.internet MimeMessage]
            [javax.jms TextMessage]
            [czlab.convoy.nettio WholeResponse]
-           [czlab.flux.wflow WorkStream Job]
+           [czlab.flux.wflow Workstream Job]
            [io.netty.channel Channel]
            [czlab.wabbit.sys Execvisor]
            [czlab.wabbit.plugs.io

@@ -20,7 +20,7 @@
         [czlab.flux.wflow.core])
 
   (:import [czlab.wabbit.ctl Pluggable Pluglet PlugMsg]
-           [czlab.flux.wflow WorkStream Job Activity]
+           [czlab.flux.wflow Workstream Job Activity]
            [czlab.jasal Triggerable]
            [java.util Timer TimerTask]))
 
@@ -81,8 +81,8 @@
        (log/debug "job#%s => %s" (.id job) (.id src))
        (do->nil
          (cond
-           (ist? WorkStream wf)
-           (.execWith ^WorkStream wf job)
+           (ist? Workstream wf)
+           (.execWith ^Workstream wf job)
            (fn? wf)
            (doto (workstream<>
                    (script<> #(wf %2) nil))

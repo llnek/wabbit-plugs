@@ -41,7 +41,7 @@
             DefaultObjectWrapper]
            [czlab.wabbit.ctl Pluglet PlugMsg]
            [czlab.wabbit.plugs.io HttpMsg]
-           [czlab.flux.wflow WorkStream Job]
+           [czlab.flux.wflow Workstream Job]
            [java.net HttpCookie]
            [czlab.convoy.net
             WebContent
@@ -275,7 +275,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn asset! "" ^WorkStream [] asset-handler)
+(defn asset! "" ^Workstream [] asset-handler)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF
