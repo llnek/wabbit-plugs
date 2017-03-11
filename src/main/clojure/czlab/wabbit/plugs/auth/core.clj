@@ -34,12 +34,12 @@
         [czlab.basal.str]
         [czlab.horde.dbio.core])
 
-  (:import [czlab.convoy.net AuthError HttpResult ULFormItems ULFileItem]
-           [org.apache.shiro.authc.credential CredentialsMatcher]
+  (:import [org.apache.shiro.authc.credential CredentialsMatcher]
            [org.apache.shiro.config IniSecurityManagerFactory]
            [org.apache.shiro.authc UsernamePasswordToken]
            [czlab.jasal XData Muble I18N BadDataError]
            [org.apache.shiro.realm AuthorizingRealm]
+           [czlab.wabbit.ctl Pluggable PlugError]
            [org.apache.shiro.subject Subject]
            [java.util Base64 Base64$Decoder]
            [org.apache.shiro SecurityUtils]
@@ -48,6 +48,7 @@
            [clojure.lang APersistentMap]
            [java.io File IOException]
            [czlab.wabbit.plugs.io HttpMsg]
+           [czlab.flux.wflow Activity Job]
            [org.apache.shiro.authz
             AuthorizationException
             AuthorizationInfo]
@@ -59,12 +60,16 @@
            [czlab.twisty IPassword]
            [java.net HttpCookie]
            [java.util Properties]
-           [czlab.flux.wflow Activity Job]
            [czlab.wabbit.plugs.auth
             AuthPluglet
             UnknownUser
             DuplicateUser]
-           [czlab.wabbit.ctl Pluggable PlugError]
+           [czlab.convoy.net
+            HttpSession
+            AuthError
+            HttpResult
+            ULFileItem
+            ULFormItems]
            [czlab.horde
             DbApi
             Schema
@@ -99,7 +104,8 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn newSession<> "" [^HttpMsg evt attrs]
+(defn newSession<>
+  "" ^HttpSession [^HttpMsg evt attrs]
 
   (let
     [s (wss/wsession<> (.. evt source server pkeyBytes)
