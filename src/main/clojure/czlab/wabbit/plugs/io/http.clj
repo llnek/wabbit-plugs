@@ -282,12 +282,11 @@
   "" [^Job job error]
   ;; 500 or 503
   (let [s (or (.getv job :statusCode) 500)
-        ^HttpMsg evt (.origin job)
-        cfg (.. evt source config)]
+        ^HttpMsg evt (.origin job)]
     (-> (httpResult<>
           evt
           (HttpResponseStatus/valueOf s))
-        (replyResult cfg))))
+        (replyResult ))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -354,7 +353,7 @@
             :domainPath "/"
           }
           :wsite {
-            :publicRootDir "${pod.dir}/public"
+            :publicRootDir "${wabbit.user.dir}/public"
             :mediaDir "res"
             :pageDir "htm"
             :jsDir "jsc"
