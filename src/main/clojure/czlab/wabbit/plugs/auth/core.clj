@@ -155,7 +155,7 @@
   (let
     [xs (some-> evt .body .getBytes)
      json (-> (if xs
-                (stringify xs) "{}")
+                (strit xs) "{}")
               (readJsonStr #(lcase %)))]
     (preduce<map>
       #(let [[k [a1 a2]] %2]
@@ -211,7 +211,7 @@
                    (caesarDecrypt shiftCount))
          s (->> decr
                 (.decode (Base64/getMimeDecoder))
-                stringify)]
+                strit)]
         (log/debug "info = %s" info)
         (log/debug "decr = %s" decr)
         (log/debug "val = %s" s)

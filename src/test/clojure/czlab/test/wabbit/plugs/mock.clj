@@ -45,7 +45,7 @@
         Execvisor
 
         (homeDir [_] (io/file (sysProp "wabbit.user.dir")))
-        (pkeyBytes [this] (bytesify "hello world"))
+        (pkeyBytes [this] (bytesit "hello world"))
         (pkey [_] (.toCharArray "hello world"))
         (cljrt [_] rts)
 

@@ -139,7 +139,7 @@
               ^WholeResponse
               rc (deref res 2000 nil)
               z (some-> rc
-                        .content .stringify)]
+                        .content .strit)]
           (.stop s)
           (.dispose s)
           (.dispose ctr)
@@ -194,7 +194,7 @@
               ^WholeResponse
               rc (deref res 2000 nil)
               z (some-> rc
-                        .content .stringify)]
+                        .content .strit)]
           (.stop s)
           (.dispose s)
           (.dispose ctr)
