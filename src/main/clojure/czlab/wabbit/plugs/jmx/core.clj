@@ -15,6 +15,7 @@
             [clojure.string :as cs])
 
   (:use [czlab.wabbit.plugs.jmx.bean]
+        [czlab.wabbit.base.core]
         [czlab.basal.core]
         [czlab.basal.str])
 
@@ -163,7 +164,7 @@
           nm))
 
       (init [_ arg]
-        (->> (or arg {})
+        (->> (prevarCfg (or arg {}))
              (.copyEx impl )))
 
       (start [_ _]

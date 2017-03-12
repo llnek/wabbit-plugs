@@ -53,6 +53,7 @@
            [io.netty.handler.ssl SslHandler]
            [clojure.lang Atom APersistentMap]
            [czlab.flux.wflow Job]
+           [czlab.basal Cljrt]
            [czlab.wabbit.sys Execvisor]
            [czlab.twisty IPassword]
            [java.util Timer TimerTask]
@@ -251,7 +252,10 @@
 (defn- boot! "" [^Pluglet co]
 
   (let
-    [{:keys [waitMillis] :as cfg}
+    [asset! (with-open [clj (Cljrt/newrt (getCldr))]
+              (.varIt clj
+                      "czlab.wabbit.plugs.io.mvc/asset!"))
+     {:keys [waitMillis] :as cfg}
      (.config co)
      bs
      (createServer<>
@@ -268,9 +272,8 @@
                             .routeGist
                             :info)
                  s? (some-> ri .isStatic)
-                 hd (strKW (some-> ri .handler))
-                 hd (if (and s? (nichts? hd))
-                      "czlab.wabbit.plugs.io.mvc/asset!" hd)]
+                 hd (some-> ri .handler)
+                 hd (if (and s? (nil? hd)) asset! hd)]
                 (if (spos? waitMillis)
                   (.hold co ev waitMillis))
                 (dispatch! ev {:handler hd}))))}) cfg)]
@@ -389,7 +392,7 @@
               (basicConfig k conf arg)
               pub (io/file (str publicRootDir)
                            (str pageDir))]
-          (.copyEx impl cfg)
+          (.copyEx impl (prevarCfg cfg))
           (->> (if webAuth?
                  (assoc pspec
                         :deps

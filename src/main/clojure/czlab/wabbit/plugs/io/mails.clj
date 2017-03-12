@@ -262,7 +262,7 @@
                        [cz-pop3 pop3c])]
            (->> (threadedTimer {:$wakeup #(wake<o> pg)})
                 (.setv impl :$funcs))
-           (.copyEx impl c2)
+           (.copyEx impl (prevarCfg c2))
            (resolveProvider pg z p)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -336,7 +336,7 @@
                        [cz-imap imap])]
            (->> (threadedTimer {:$wakeup #(wake<i> pg)})
                 (.setv impl :$funcs))
-           (.copyEx impl c2)
+           (.copyEx impl (prevarCfg c2))
            (resolveProvider pg z p)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

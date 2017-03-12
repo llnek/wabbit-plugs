@@ -103,7 +103,7 @@
                            :$parent :$ssoc))
        (spec [_] pspec)
        (init [_ arg]
-         (.copyEx impl (merge conf arg)))
+         (.copyEx impl (prevarCfg (merge conf arg))))
        (start [this _]
          (when-some
            [ss (ssoc<> (.intern impl))]

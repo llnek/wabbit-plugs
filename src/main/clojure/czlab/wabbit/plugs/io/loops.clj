@@ -171,7 +171,7 @@
                           :$timer :$parent))
       (spec [_] tspec)
       (init [_ arg]
-        (.copyEx impl (merge conf arg)))
+        (.copyEx impl (prevarCfg (merge conf arg))))
       (start [this arg]
         (let [t (doto->>
                   (Timer. true)

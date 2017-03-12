@@ -259,8 +259,9 @@
          (let [^Pluglet pg (.parent this)
                k (.. pg server pkey)]
            (.copyEx impl
-                    (merge conf
-                         (sanitize k arg)))))
+                    (prevarCfg
+                      (merge conf
+                         (sanitize k arg))))))
        (start [this _]
          (when-some [c (start2 this (.intern impl))]
            (.setv impl :$conn c)))

@@ -644,6 +644,7 @@
 
       (init [_ arg]
         (assertPluginOK (.dftDbPool ctr))
+        (prevarCfg arg)
         (initShiro (.homeDir ctr)
                    (.pkey ctr)))
 

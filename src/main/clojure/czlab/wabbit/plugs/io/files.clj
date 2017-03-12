@@ -180,7 +180,7 @@
        (init [_ arg]
          (->> (threadedTimer {:$schedule sch})
               (.setv impl :$funcs))
-         (.copyEx impl (init2 conf arg)))
+         (.copyEx impl (prevarCfg (init2 conf arg))))
        (start [this _]
          (let [m (fileMon<> this
                             (.intern impl))]

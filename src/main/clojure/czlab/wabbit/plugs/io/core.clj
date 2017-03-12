@@ -15,12 +15,14 @@
             [czlab.basal.logging :as log])
 
   (:use [czlab.wabbit.base.core]
+        [czlab.flux.wflow.core]
         [czlab.basal.core]
-        [czlab.basal.str]
-        [czlab.flux.wflow.core])
+        [czlab.basal.meta]
+        [czlab.basal.str])
 
   (:import [czlab.wabbit.ctl Pluggable Pluglet PlugMsg]
            [czlab.flux.wflow Workstream Job Activity]
+           [czlab.basal Cljrt]
            [czlab.jasal Triggerable]
            [java.util Timer TimerTask]))
 
@@ -64,14 +66,15 @@
    (let
      [src (.source evt)
       cfg (.config src)
-      c0 (strKW (:handler cfg))
-      c1 (strKW (:handler arg))
+      c0 (:handler cfg)
+      c1 (:handler arg)
       ctr (.server src)
       rts (.cljrt ctr)
-      cb (stror c1 c0)
+      cb (or c1 c0)
+      _ (assert (ifn? cb))
       job (job<> (.core ctr) nil evt)
       wf (or
-           (try! (.call rts cb))
+           (try! (.callVar rts cb))
            (error! src job nil))]
      (log/debug
        (str "type = %s\n"
