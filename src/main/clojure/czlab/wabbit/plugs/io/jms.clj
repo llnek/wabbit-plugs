@@ -89,7 +89,7 @@
             (.createConnection
               cf
               jmsUser
-              (stror pwd nil))
+              (stror (str pwd) nil))
             (.createConnection cf))]
     (if (ist? Destination c)
       ;;TODO ? ack always ?
@@ -121,7 +121,7 @@
             (.createTopicConnection
               cf
               jmsUser
-              (stror pwd nil))
+              (stror (str pwd) nil))
             (.createTopicConnection cf))
      s (.createTopicSession
          conn false Session/CLIENT_ACKNOWLEDGE)
@@ -155,7 +155,7 @@
             (.createQueueConnection
               cf
               jmsUser
-              (stror pwd nil))
+              (stror (str pwd) nil))
             (.createQueueConnection cf))
      s (.createQueueSession conn
                             false Session/CLIENT_ACKNOWLEDGE)

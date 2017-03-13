@@ -133,16 +133,16 @@
                 ^String proto]}
         (.intern (.getx co))
         {:keys [^String host
-                port
                 ^String user
-                ^String passwd]}
+                port
+                passwd]}
         (.config co)]
     (when-some [s (.getStore session proto)]
       (.connect s
                 host
                 ^long port
                 user
-                (stror passwd nil))
+                (stror (str passwd) nil))
       (doto (.getx co)
         (.setv :folder
                (some-> (.getDefaultFolder s)

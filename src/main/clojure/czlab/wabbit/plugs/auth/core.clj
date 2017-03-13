@@ -381,7 +381,7 @@
 (defn getLoginAccount
 
   "Get the user account"
-  [^SQLr sql ^String user ^String pwd]
+  [^SQLr sql ^String user pwd]
 
   (if-some
     [acct (findLoginAccount sql user)]
@@ -724,7 +724,7 @@
           pc (.getCredentials inf)
           tstPwd (passwd<> pwd)
           acc (-> (.getPrincipals inf)
-                  (.getPrimaryPrincipal))]
+                  .getPrimaryPrincipa)]
       (and (= (:acctid acc) uid)
            (.validateHash tstPwd pc)))))
 
@@ -737,9 +737,7 @@
         cmd (nth args 1)
         db (nth args 2)
         pod (slurpXXXConf homeDir cfg-pod-cf true)
-        pkey (-> (get-in pod
-                         [:info :digest])
-                 str .toCharArray)
+        pkey (get-in pod [:info :digest])
         cfg (get-in pod [:rdbms (keyword db)])]
     (when cfg
       (let [pwd (.text (passwd<> (:passwd cfg) pkey))

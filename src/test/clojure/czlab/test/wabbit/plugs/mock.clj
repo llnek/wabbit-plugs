@@ -25,7 +25,7 @@
   (:import [czlab.jasal Activable Schedulable]
            [czlab.wabbit.plugs.io HttpMsg]
            [czlab.wabbit.sys Execvisor]
-           [czlab.wabbit.base Cljshim]
+           [czlab.basal Cljrt]
            [czlab.wabbit.ctl PlugMsg]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -36,7 +36,7 @@
 (defn- mkexe "" ^Execvisor []
 
   (let
-    [rts (Cljshim/newrt (getCldr) "mock")
+    [rts (Cljrt/newrt (getCldr) "mock")
      pid (jid<>)
      cpu (scheduler<> pid)
      impl (muble<> {:plugs {}})]
