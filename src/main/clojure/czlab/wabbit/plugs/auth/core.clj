@@ -722,10 +722,7 @@
           pwd (.getCredentials tkn)
           uid (.getPrincipal tkn)
           pc (.getCredentials inf)
-          tstPwd (passwd<>
-                   (if (instChars? pwd)
-                     (String. ^chars pwd)
-                     (str pwd)))
+          tstPwd (passwd<> pwd)
           acc (-> (.getPrincipals inf)
                   (.getPrimaryPrincipal))]
       (and (= (:acctid acc) uid)
