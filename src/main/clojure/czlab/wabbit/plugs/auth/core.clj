@@ -332,8 +332,7 @@
 
    (let [m (.get (.metas sql)
                  :czlab.wabbit.plugs.auth.model/LoginAccount)
-         ps (if pwdObj
-              (:hash (.hashed pwdObj)))
+         ps (some-> pwdObj .hashed)
          acc
          (->>
            (dbSetFlds* (dbpojo<> m)
@@ -407,9 +406,7 @@
   {:pre [(some? sql)
          (map? userObj)(some? pwdObj)]}
 
-  (let [ps (.hashed pwdObj)
-        m {:passwd (:hash ps)
-           :salt (:salt ps)}]
+  (let [m {:passwd (some-> pwdObj .hashed)}]
     (->> (dbSetFlds*
            (mockPojo<> userObj) m)
          (.update sql))
@@ -724,7 +721,7 @@
           pc (.getCredentials inf)
           tstPwd (passwd<> pwd)
           acc (-> (.getPrincipals inf)
-                  .getPrimaryPrincipa)]
+                  .getPrimaryPrincipal)]
       (and (= (:acctid acc) uid)
            (.validateHash tstPwd pc)))))
 
