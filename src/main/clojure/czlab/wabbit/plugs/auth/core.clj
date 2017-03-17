@@ -496,9 +496,11 @@
   ""
   [^File homeDir ^String podKey]
 
-  (let [f (io/file homeDir "etc/shiro.ini")]
-    (if-not (fileRead? f)
-      (trap! ConfigError "Missing shiro ini file"))
+  (let [f (io/file homeDir "etc/shiro.ini")
+        f (if-not (fileRead? f)
+            (doto (io/file *tempfile-repo* (jid<>))
+              (spit (resStr "czlab/wabbit/plugs/auth/shiro.ini")))
+            f)]
     (-> (io/as-url f)
         str
         IniSecurityManagerFactory.
