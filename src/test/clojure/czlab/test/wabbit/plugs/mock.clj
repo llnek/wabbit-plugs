@@ -40,42 +40,40 @@
      pid (jid<>)
      cpu (scheduler<> pid)
      impl (muble<> {:plugs {}})]
-    (with-meta
-      (reify
-        Execvisor
 
-        (homeDir [_] (io/file (sysProp "wabbit.user.dir")))
-        (pkeyBytes [this] (bytesit "hello world"))
-        (pkey [_] (.toCharArray "hello world"))
-        (cljrt [_] rts)
+    (reify
+      Execvisor
 
-        (getx [_] impl)
-        (version [_] "1.0")
-        (id [_] pid)
+      (homeDir [_] (io/file (sysProp "wabbit.user.dir")))
+      (pkeyBytes [this] (bytesit "hello world"))
+      (pkey [_] (.toCharArray "hello world"))
+      (cljrt [_] rts)
 
-        (uptimeInMillis [_] 0)
-        (locale [_] nil)
-        (startTime [_] 0)
-        (kill9 [_] )
-        (start [this _] )
-        (stop [this] )
+      (getx [_] impl)
+      (version [_] "1.0")
+      (id [_] pid)
 
-        (acquireDbPool [_ gid] nil)
-        (acquireDbAPI [_ gid] nil)
-        (dftDbPool [_] nil)
-        (dftDbAPI [_] nil)
+      (uptimeInMillis [_] 0)
+      (locale [_] nil)
+      (startTime [_] 0)
+      (kill9 [_] )
+      (start [this _] )
+      (stop [this] )
 
-        (child [_ sid])
-        (hasChild [_ sid])
+      (acquireDbPool [_ gid] nil)
+      (acquireDbAPI [_ gid] nil)
+      (dftDbPool [_] nil)
+      (dftDbAPI [_] nil)
 
-        (core [_] cpu)
-        (config [_] {})
+      (child [_ sid])
+      (hasChild [_ sid])
 
-        (dispose [this]
-          (.dispose cpu)
-          (.close rts)))
+      (core [_] cpu)
+      (config [_] {})
 
-      {:typeid ::Execvisor})))
+      (dispose [this]
+        (.dispose cpu)
+        (.close rts)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

@@ -117,13 +117,11 @@
 (defn- evt<>
   "" [^Pluglet co {:keys [msg]}]
 
-  (let [eeid (str "event#" (seqint2))]
-    (with-meta
-      (reify MailMsg
-        (id [_] eeid)
-        (source [_] co)
-        (message [_] msg))
-      {:typeid ::MailMsg })))
+  (let [eeid (str "MailMsg." (seqint2))]
+    (reify MailMsg
+      (id [_] eeid)
+      (source [_] co)
+      (message [_] msg))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

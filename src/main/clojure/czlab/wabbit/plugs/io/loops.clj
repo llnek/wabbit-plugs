@@ -119,14 +119,12 @@
 ;;
 (defn- evt<> ^TimerMsg [co repeat?]
 
-  (let [eeid (str "event#" (seqint2))]
-    (with-meta
-      (reify
-        TimerMsg
-        (id [_] eeid)
-        (source [_] co)
-        (isRepeating [_] repeat?))
-      {:typeid ::TimerMsg})))
+  (let [eeid (str "TimerMsg." (seqint2))]
+    (reify
+      TimerMsg
+      (id [_] eeid)
+      (source [_] co)
+      (isRepeating [_] repeat?))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

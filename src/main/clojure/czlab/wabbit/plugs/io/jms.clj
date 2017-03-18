@@ -53,14 +53,12 @@
 (defn- evt<>
   "" [co {:keys [msg]}]
 
-  (let [eeid (str "event#" (seqint2))
+  (let [eeid (str "JmsMsg." (seqint2))
         impl (muble<>)]
-    (with-meta
-      (reify JmsMsg
-        (id [_] eeid)
-        (source [_] co)
-        (message [_] msg))
-      {:typeid ::JmsMsg})))
+    (reify JmsMsg
+      (id [_] eeid)
+      (source [_] co)
+      (message [_] msg))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

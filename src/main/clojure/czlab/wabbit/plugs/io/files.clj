@@ -47,15 +47,13 @@
   ""
   [co {:keys [fname fp]}]
   (let
-    [eeid (str "file#" (seqint2))
+    [eeid (str "FileMsg." (seqint2))
      f (io/file fp)]
-    (with-meta
-      (reify FileMsg
-        (originalFileName [_] fname)
-        (source [_] co)
-        (file [_] f)
-        (id [_] eeid))
-      {:typeid ::FileMsg})))
+    (reify FileMsg
+      (originalFileName [_] fname)
+      (source [_] co)
+      (file [_] f)
+      (id [_] eeid))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

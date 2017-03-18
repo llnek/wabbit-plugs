@@ -34,15 +34,13 @@
 (defn- evt<>
   "" [co {:keys [^Socket socket]}]
 
-  (let [eeid (str "event#" (seqint2))]
-    (with-meta
-      (reify TcpMsg
-        (id [_] eeid)
-        (sockOut [_] (.getOutputStream socket))
-        (sockIn [_] (.getInputStream socket))
-        (source [_] co)
-        (dispose [_] (closeQ socket)))
-      {:typeid ::TcpMsg})))
+  (let [eeid (str "TcpMsg." (seqint2))]
+    (reify TcpMsg
+      (id [_] eeid)
+      (sockOut [_] (.getOutputStream socket))
+      (sockIn [_] (.getInputStream socket))
+      (source [_] co)
+      (dispose [_] (closeQ socket)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

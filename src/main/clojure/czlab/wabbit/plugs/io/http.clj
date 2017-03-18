@@ -154,17 +154,15 @@
                (cast? TextWebSocketFrame msg) .text))
          xdata<> )
      ssl? (maybeSSL? ch)
-     eeid (seqint2)]
-    (with-meta
-      (reify WsockMsg
-        (isBinary [_] (instBytes? (.content body')))
-        (isText [_] (string? (.content body')))
-        (socket [_] ch)
-        (id [_] eeid)
-        (isSSL [_] ssl?)
-        (body [_] body')
-        (source [_] co))
-      {:typeid ::WsockMsg})))
+     eeid (str "WsockMsg." (seqint2))]
+    (reify WsockMsg
+      (isBinary [_] (instBytes? (.content body')))
+      (isText [_] (string? (.content body')))
+      (socket [_] ch)
+      (id [_] eeid)
+      (isSSL [_] ssl?)
+      (body [_] body')
+      (source [_] co))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -179,7 +177,7 @@
      (.config co)
      ^RouteInfo
      ri (get-in gs [:route :info])
-     eeid (str "event#" (seqint2))
+     eeid (str "HttpMsg." (seqint2))
      cookieJar (:cookies gs)
      pkey (.. co server pkeyBytes)
      s? (and (!false? wantSession?)
@@ -188,55 +186,52 @@
            (->> (:macit? session)
                 (upstream pkey cookieJar)))
      impl (muble<> {:$session wss :$stale? false})]
-    (with-meta
-      (reify HttpMsg
+    (reify HttpMsg
 
-        (session [_] (.getv impl :$session))
-        (id [_] eeid)
-        (source [_] co)
-        (socket [_] ch)
+      (session [_] (.getv impl :$session))
+      (id [_] eeid)
+      (source [_] co)
+      (socket [_] ch)
 
-        ;;:route {:redirect :status? :info :groups :places}
-        (routeGist [_] (:route gs))
+      ;;:route {:redirect :status? :info :groups :places}
+      (routeGist [_] (:route gs))
 
-        (cookie [_ n] (get cookieJar n))
-        (cookies [_] (vals cookieJar))
-        (gist [_] gs)
-        (body [_] body')
+      (cookie [_ n] (get cookieJar n))
+      (cookies [_] (vals cookieJar))
+      (gist [_] gs)
+      (body [_] body')
 
-        (localAddr [_] (.. laddr getAddress getHostAddress))
-        (localHost [_] (. laddr getHostName))
-        (localPort [_] (. laddr getPort))
+      (localAddr [_] (.. laddr getAddress getHostAddress))
+      (localHost [_] (. laddr getHostName))
+      (localPort [_] (. laddr getPort))
 
-        (remotePort [_]
-          (convLong (gistHeader gs "remote_port") 0))
-        (remoteAddr [_]
-          (str (gistHeader gs "remote_addr")))
-        (remoteHost [_]
-          (str (gistHeader gs "remote_host")))
+      (remotePort [_]
+        (convLong (gistHeader gs "remote_port") 0))
+      (remoteAddr [_]
+        (str (gistHeader gs "remote_addr")))
+      (remoteHost [_]
+        (str (gistHeader gs "remote_host")))
 
-        (serverPort [_]
-          (convLong (gistHeader gs "server_port") 0))
-        (serverName [_]
-          (str (gistHeader gs "server_name")))
+      (serverPort [_]
+        (convLong (gistHeader gs "server_port") 0))
+      (serverName [_]
+        (str (gistHeader gs "server_name")))
 
-        (setTrigger [_ t] (.setv impl :$trigger t))
-        (cancel [_]
-          (some-> (.unsetv impl :$trigger)
-                  cancelTimerTask ))
+      (setTrigger [_ t] (.setv impl :$trigger t))
+      (cancel [_]
+        (some-> (.unsetv impl :$trigger)
+                cancelTimerTask ))
 
-        (fire [this _]
-          (when-some [t (.unsetv impl :$trigger)]
-            (.setv impl :$stale? true)
-            (cancelTimerTask t)
-            (resumeOnExpiry ch this)))
+      (fire [this _]
+        (when-some [t (.unsetv impl :$trigger)]
+          (.setv impl :$stale? true)
+          (cancelTimerTask t)
+          (resumeOnExpiry ch this)))
 
-        (scheme [_] (if (:ssl? gs) "https" "http"))
-        (isStale [_] (.getv impl :$stale?))
-        (isSSL [_] (:ssl? gs))
-        (getx [_] impl))
-
-      {:typeid ::HTTPMsg})))
+      (scheme [_] (if (:ssl? gs) "https" "http"))
+      (isStale [_] (.getv impl :$stale?))
+      (isSSL [_] (:ssl? gs))
+      (getx [_] impl))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

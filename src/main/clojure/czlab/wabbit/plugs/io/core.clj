@@ -77,13 +77,11 @@
            (try! (.callVar rts cb))
            (error! src job nil))]
      (log/debug
-       (str "type = %s\n"
+       (str "source = %s\n"
             "arg = %s\n"
-            "cb = %s") (meta src) arg c1 c0)
-     (log/debug
-       (str "cfg=%s\n" "arg=%s\n") cfg arg)
+            "cb = %s") (gtid src) arg cb)
      (try
-       (log/debug "job#%s => %s" (.id job) (.id src))
+       (log/debug "#%s => %s" (.id job) (.id src))
        (do->nil
          (cond
            (ist? Workstream wf)
