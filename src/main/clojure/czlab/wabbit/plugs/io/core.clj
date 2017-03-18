@@ -79,7 +79,9 @@
      (log/debug
        (str "type = %s\n"
             "arg = %s\n"
-            "cb = %s") (gtid src) arg c1 c0)
+            "cb = %s") (meta src) arg c1 c0)
+     (log/debug
+       (str "cfg=%s\n" "arg=%s\n") cfg arg)
      (try
        (log/debug "job#%s => %s" (.id job) (.id src))
        (do->nil
