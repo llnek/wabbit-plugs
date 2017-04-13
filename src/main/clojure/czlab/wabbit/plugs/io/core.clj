@@ -14,30 +14,32 @@
   (:require [czlab.basal.meta :refer [getCldr]]
             [czlab.basal.logging :as log])
 
-  (:use [czlab.wabbit.base.core]
-        [czlab.flux.wflow.core]
+  (:use [czlab.wabbit.base]
+        [czlab.wabbit.xpis]
+        [czlab.flux.wflow]
         [czlab.basal.core]
         [czlab.basal.meta]
         [czlab.basal.str])
 
-  (:import [czlab.wabbit.ctl Pluggable Pluglet PlugMsg]
-           [czlab.flux.wflow Workstream Job Activity]
-           [czlab.basal Cljrt]
+  (:import [czlab.basal Cljrt]
            [czlab.jasal Triggerable]
            [java.util Timer TimerTask]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;(set! *warn-on-reflection* true)
 
+(defobject FileMsg)
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- processOrphan ""
   ([job] (processOrphan job nil))
-  ([^Job job ^Throwable e]
-   (let [evt (.origin job)]
+  ([job ^Throwable e]
+   (let [evt (rootage job)]
      (some-> e log/exception )
      (log/error (str "event [%s] "
-                     "job#%s dropped") (gtid evt) (.id job)))))
+                     "job#%s dropped") (gtid evt) (id?? job)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -50,29 +52,30 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- error!
-  "" [^Pluglet co job e]
+  "" [pglet job e]
   (if-some+
-    [r (strKW (:eror (.spec co)))]
-    (.callEx (.. co server cljrt)
-             r
-             (vargs* Object job e))))
+    [r (strKW (:eror (plugSpec pglet)))]
+    (.callEx ^Cljrt
+             (-> pglet
+                 getServer cljrt) r (vargs* Object job e))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn dispatch! ""
   ([evt] (dispatch! evt nil))
-  ([^PlugMsg evt arg]
-   (log/debug "[%s] event is disp!" (.. evt source id))
+  ([evt arg]
+   (log/debug "[%s] event is disp!" (-> evt
+                                        msgSource id??))
    (let
-     [src (.source evt)
+     [^Config src (msgSource evt)
       cfg (.config src)
       c0 (:handler cfg)
       c1 (:handler arg)
-      ctr (.server src)
-      rts (.cljrt ctr)
+      ctr (getServer src)
+      ^Cljrt rts (cljrt ctr)
       cb (or c1 c0)
       _ (assert (ifn? cb))
-      job (job<> (.core ctr) nil evt)
+      job (job<> (scheduler ctr) nil evt)
       wf (or
            (try! (.callVar rts cb))
            (error! src job nil))]
@@ -81,15 +84,14 @@
             "arg = %s\n"
             "cb = %s") (gtid src) arg cb)
      (try
-       (log/debug "#%s => %s" (.id job) (.id src))
+       (log/debug "#%s => %s" (id?? job) (id?? src))
        (do->nil
          (cond
-           (ist? Workstream wf)
-           (.execWith ^Workstream wf job)
+           (satisfies? Workstream wf)
+           (execWith wf job)
            (fn? wf)
-           (doto (workstream<>
-                   (script<> #(wf %2) nil))
-             (.execWith job))
+           (-> (workstream<> (script<> #(wf %2) nil))
+               (execWith job))
            :else
            (processOrphan job)))))))
 

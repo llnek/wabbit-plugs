@@ -17,15 +17,13 @@
 
   (:use [czlab.wabbit.plugs.io.loops]
         [czlab.wabbit.plugs.io.core]
-        [czlab.wabbit.base.core]
+        [czlab.wabbit.base]
         [czlab.basal.core]
         [czlab.basal.str])
 
   (:import [java.io FileFilter File IOException]
            [java.util Properties ResourceBundle]
-           [czlab.wabbit.ctl Pluglet Pluggable]
            [clojure.lang APersistentMap]
-           [czlab.wabbit.plugs.io FileMsg]
            [org.apache.commons.io.filefilter
             SuffixFileFilter
             PrefixFileFilter
@@ -46,20 +44,18 @@
 (defn- evt<>
   ""
   [co {:keys [fname fp]}]
-  (let
-    [eeid (str "FileMsg." (seqint2))
-     f (io/file fp)]
-    (reify FileMsg
-      (originalFileName [_] fname)
-      (source [_] co)
-      (file [_] f)
-      (id [_] eeid))))
+
+  (object<> FileMsg
+            {:file (io/file fp)
+             :source co
+             :originalFileName fname
+             :id [_] (str "FileMsg." (seqint2))}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- postPoll
   "Only look for new files"
-  [^Pluggable co {:keys [recvFolder]} ^File f action]
+  [plug {:keys [recvFolder]} ^File f action]
   (let
     [orig (.getName f)]
     (if-some
@@ -68,9 +64,9 @@
             (try!
               (doto->> (io/file recvFolder orig)
                        (FileUtils/moveFile f))))]
-      (-> (evt<> (.parent co)
-                  {:fname orig
-                   :fp cf :action action})
+      (-> (evt<> (.parent ^Hierarchial plug)
+                 {:fname orig
+                  :fp cf :action action})
           dispatch! ))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -115,9 +111,9 @@
 (defn- fileMon<>
   ""
   ^FileAlterationMonitor
-  [co {:keys [targetFolder
-              intervalSecs
-              ^FileFilter fmask] :as cfg}]
+  [plug {:keys [targetFolder
+                intervalSecs
+                ^FileFilter fmask] :as cfg}]
   (let
     [obs (FileAlterationObserver. (io/file targetFolder) fmask)
      mon (-> (s2ms intervalSecs)

@@ -12,7 +12,7 @@
   [[org.apache.geronimo.specs/geronimo-jms_1.1_spec "1.1.1"]
    ;;[com.github.spullara.mustache.java/compiler "0.9.4" ]
    ;;[com.google.code.findbugs/jsr305 "3.0.1"]
-   [org.freemarker/freemarker "2.3.25-incubating"]
+   [org.freemarker/freemarker "2.3.26-incubating"]
    [org.apache.shiro/shiro-core "1.3.2"]
    [io.czlab/flux "1.0.0"]
    [io.czlab/nettio "1.0.0"]
@@ -25,9 +25,7 @@
 
   :profiles {:provided {:dependencies
                         [[org.clojure/clojure "1.8.0" :scope "provided"]
-                         [net.mikera/cljunit "0.6.0" :scope "test"]
-                         [io.czlab/proto "1.0.0" :scope "test"]
-                         [junit/junit "4.12" :scope "test"]]}
+                         [io.czlab/proto "1.0.0" :scope "test"]]}
              :uberjar {:aot :all}}
 
   :javadoc-opts {:package-names ["czlab.wabbit"]
