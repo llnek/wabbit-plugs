@@ -19,7 +19,6 @@
 
   (:import [java.lang Exception IllegalArgumentException]
            [java.lang.reflect Field Method]
-           [czlab.wabbit.jmx NameParams]
            [javax.management
             AttributeList
             Attribute
@@ -36,6 +35,34 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;(set! *warn-on-reflection* true)
+
+(defobject NameParams
+  Object
+  (toString [_]
+    (let [{:keys [name params]} @data]
+      (if (empty? params)
+        name
+        (str name "/" (cs/join "#" params)))))
+  (hashCode [_]
+    (let [{:keys [name params]} @data]
+      (int (reduce
+             #(+ %1 (.hashCode %2))
+             (* 31 (+ 31 (.hashCode name)))
+             params))))
+  (equals [me obj]
+    (and obj
+         (= (.getClass me) (.getClass obj))
+         (= (:name @data) (:name @obj))
+         (= (:params @data) (:params @obj)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+(defn nameParams<> ""
+  ([name] (nameParams<> name nil))
+  ([name pms]
+   (object<> NameParams
+             {:name name
+              :params (or pms [])})))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -302,9 +329,8 @@
                               ptypes))
       [(assoc! mtds
                (->> ptypes
-                    (map #(.getName ^Class %))
-                    (into-array String)
-                    (NameParams. mn))
+                    (mapv #(.getName ^Class %))
+                    (nameParams<> mn))
                m)
        (conj! rc (beanOpInfo<> m))]
       [mtds rc])))
@@ -417,7 +443,8 @@
 
       (invoke [_ opName params sig]
         (if-some
-          [^Method mtd (mtdsMap (NameParams. opName sig))]
+          [^Method mtd (mtdsMap (nameParams<> opName
+                                              (into [] sig)))]
           (try!
             (log/debug "jmx-invoke: '%s'\n%s%s\n%s%s"
                        opName "(params) " (seq params) "(sig) " (seq sig))
