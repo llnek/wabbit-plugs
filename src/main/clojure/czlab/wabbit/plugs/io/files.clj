@@ -39,6 +39,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;(set! *warn-on-reflection* false)
 
+(defobject FileMsg)
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- evt<>
@@ -49,7 +51,7 @@
             {:file (io/file fp)
              :source co
              :originalFileName fname
-             :id [_] (str "FileMsg." (seqint2))}))
+             :id (str "FileMsg." (seqint2))}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -151,39 +153,58 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn FilePicker "" ^Pluggable
+(defentity FilePickerObj
+
+  Pluggable
+  (pluggableSpec [_] (:pspec @data))
+
+  Hierarchial
+  (setParent [me p] (alterStateful me assoc :$parent p))
+  (parent [_] (:$parent @data))
+
+  Config
+  (config [_] (dissoc @data :$mon :$funcs :$parent))
+
+  Initable
+  (init [me arg]
+    (let [{:keys [conf sch]} @data]
+      (alterStateful me
+                     merge
+                     (prevarCfg (init2 conf arg)))
+      (->> (threadedTimer {:$schedule sch})
+           (alterStateful me assoc :$funcs))))
+
+  Startable
+  (start [me _]
+    (let [{:keys [$funcs] :as cfg} @data
+          starter (:$start $funcs)]
+      (alterStateful me assoc :$mon (fileMon<> me cfg))
+      (starter cfg)))
+  (stop [me]
+    (let [m (:$mon @data)]
+      (alterStateful me dissoc :$mon)
+      (log/info "apache io monitor stopping...")
+      (some-> ^FileAlterationMonitor m ,stop))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+(defn FilePicker "" ^czlab.wabbit.xpis.Pluggable
 
   ([_ id] (FilePicker _ id (FilePickerSpec)))
-
   ([_ id spec]
    (let
      [{:keys [conf] :as pspec}
-      (update-in spec [:conf] expandVarsInForm)
-      impl (muble<>)
-      sch
-      #(let [_ %]
-         (log/info "apache io monitor starting...")
-         (some-> ^FileAlterationMonitor
-                 (.getv impl :$mon) .start))]
-     (reify Pluggable
-       (setParent [_ p] (.setv impl :$parent p))
-       (parent [_] (.getv impl :$parent))
-       (config [_] (dissoc (.intern impl)
-                           :$mon :$funcs :$parent))
-       (spec [_] pspec)
-       (init [_ arg]
-         (->> (threadedTimer {:$schedule sch})
-              (.setv impl :$funcs))
-         (.copyEx impl (prevarCfg (init2 conf arg))))
-       (start [this _]
-         (let [m (fileMon<> this
-                            (.intern impl))]
-           (.setv impl :$mon m)
-           ((:$start (.getv impl :$funcs)) (.intern impl))))
-       (stop [_]
-         (log/info "apache io monitor stopping...")
-         (some-> ^FileAlterationMonitor
-                 (.unsetv impl :$mon) .stop))))))
+      (update-in spec
+                 [:conf]
+                 expandVarsInForm)
+      ^Stateful
+      ent (entity<> FilePickerObj
+                    {:pspec pspec :conf conf})
+      sch #(let [_ %
+                 data (.state ent)]
+             (log/info "apache io monitor starting...")
+             (some-> ^FileAlterationMonitor (:$mon @data) .start))]
+     (alterStateful ent assoc :sch sch))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF

@@ -28,9 +28,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;(set! *warn-on-reflection* true)
 
-(defobject FileMsg)
-
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- processOrphan ""
@@ -90,7 +87,7 @@
            (satisfies? Workstream wf)
            (execWith wf job)
            (fn? wf)
-           (-> (workstream<> (script<> #(wf %2) nil))
+           (-> (workstream<> (script<> #(wf %2) ))
                (execWith job))
            :else
            (processOrphan job)))))))
