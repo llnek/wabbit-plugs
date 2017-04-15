@@ -12,7 +12,7 @@
   czlab.wabbit.plugs.io.http
 
   (:require [czlab.basal.io :refer [dirReadWrite? xdata<> slurpUtf8]]
-            [czlab.convoy.net.util :refer [parseBasicAuth]]
+            [czlab.convoy.util :refer [parseBasicAuth]]
             [czlab.basal.format :refer [readEdn]]
             [czlab.twisty.codec :refer [passwd<>]]
             [czlab.basal.logging :as log]
@@ -20,31 +20,29 @@
             [clojure.java.io :as io]
             [clojure.string :as cs])
 
-  (:use [czlab.convoy.nettio.discarder]
-        [czlab.convoy.nettio.core]
-        [czlab.wabbit.plugs.io.core]
-        [czlab.wabbit.base.core]
-        [czlab.convoy.net.core]
-        [czlab.convoy.net.wess]
-        [czlab.convoy.net.server]
-        [czlab.convoy.net.routes]
-        [czlab.flux.wflow.core]
+  (:use [czlab.wabbit.plugs.io.core]
+        [czlab.nettio.discarder]
+        [czlab.nettio.core]
+        [czlab.wabbit.base]
+        [czlab.convoy.core]
+        [czlab.convoy.wess]
+        [czlab.convoy.server]
+        [czlab.convoy.routes]
+        [czlab.flux.wflow]
         [czlab.twisty.ssl]
         [czlab.basal.core]
         [czlab.basal.io]
         [czlab.basal.str]
         [czlab.basal.meta])
 
-  (:import [czlab.convoy.net HttpResult RouteCracker RouteInfo]
-           [czlab.convoy.nettio WholeRequest InboundHandler]
+  (:import [czlab.convoy HttpResult RouteCracker RouteInfo]
+           [czlab.nettio WholeRequest InboundHandler]
            [java.nio.channels ClosedChannelException]
            [io.netty.handler.codec.http.websocketx
             TextWebSocketFrame
             WebSocketFrame
             BinaryWebSocketFrame]
-           [czlab.wabbit.ctl Pluggable Pluglet PlugMsg]
            [io.netty.handler.codec DecoderException]
-           [czlab.wabbit.plugs.io HttpMsg WsockMsg]
            [io.netty.handler.codec.http.cookie
             ServerCookieDecoder
             ServerCookieEncoder]
@@ -52,10 +50,7 @@
            [io.netty.buffer ByteBuf Unpooled]
            [io.netty.handler.ssl SslHandler]
            [clojure.lang Atom APersistentMap]
-           [czlab.flux.wflow Job]
            [czlab.basal Cljrt]
-           [czlab.wabbit.sys Execvisor]
-           [czlab.twisty IPassword]
            [java.util Timer TimerTask]
            [io.netty.handler.codec.http
             HttpResponseStatus
@@ -110,10 +105,7 @@
 (defn scanBasicAuth
   "Scan and parse if exists basic authentication"
   ^APersistentMap
-  [^HttpMsg evt]
-  (if-some+ [v (-> (.gist evt)
-                   (gistHeader auth-token))]
-    (parseBasicAuth v)))
+  [evt] (if-some+ [v (msgHeader evt auth-token)] (parseBasicAuth v)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -124,8 +116,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- maybeClose
-  "" [^HttpMsg evt ^ChannelFuture cf]
-  (closeCF cf (:isKeepAlive? (.gist evt))))
+  "" [evt cf] (closeCF cf (:isKeepAlive? @evt)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
