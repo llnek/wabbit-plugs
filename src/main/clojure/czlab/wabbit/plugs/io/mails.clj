@@ -15,13 +15,12 @@
             [czlab.basal.logging :as log])
 
   (:use [czlab.wabbit.plugs.io.loops]
-        [czlab.wabbit.base.core]
+        [czlab.wabbit.plugs.io.core]
+        [czlab.wabbit.base]
         [czlab.basal.core]
-        [czlab.basal.str]
-        [czlab.wabbit.plugs.io.core])
+        [czlab.basal.str])
 
   (:import [javax.mail.internet MimeMessage]
-           [czlab.wabbit.plugs.io MailMsg]
            [clojure.lang APersistentMap]
            [javax.mail
             Flags$Flag
@@ -32,8 +31,7 @@
             Provider
             Provider$Type]
            [java.util Properties]
-           [java.io IOException]
-           [czlab.wabbit.ctl Pluglet Pluggable]))
+           [java.io IOException]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;(set! *warn-on-reflection* true)
@@ -62,30 +60,24 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- closeFolder "" [^Folder fd]
-
   (if fd
     (try!
       (if (.isOpen fd) (.close fd true)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- closeStore "" [^Pluglet co]
+(defn- closeStore "" [co]
 
-  (let [{:keys [store folder]}
-        (.intern (.getx co))]
+  (let [{:keys [store folder]} @co]
     (closeFolder folder)
-    (if store
-      (try!
-        (.close ^Store store)))
-    (doto (.getx co)
-      (.unsetv :store)
-      (.unsetv :folder))))
+    (try! (some-> ^Store store .close))
+    (alterStateful co dissoc :store :folder)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- resolveProvider
   ""
-  [^Pluglet co ^String cz ^String proto]
+  [co ^String cz ^String proto]
 
   (let
     [mockp (sysProp "wabbit.mock.mail.proto")
@@ -108,28 +100,28 @@
       (throwIOE (str "Failed to find store: " pz)))
     (log/info "mail store impl = %s" sun)
     (.setProvider ss sun)
-    (doto (.getx co)
-      (.setv :proto proto)
-      (.setv :session ss))))
+    (alterStateful co
+                   assoc
+                   :proto proto
+                   :session ss)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- evt<>
-  "" [^Pluglet co {:keys [msg]}]
-
-  (let [eeid (str "MailMsg." (seqint2))]
-    (reify MailMsg
-      (id [_] eeid)
-      (source [_] co)
-      (message [_] msg))))
+(defobject MailMsg)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- connectPop3 "" [^Pluglet co]
+(defn- evt<> "" [co msg]
+  (object<> MainMsg
+            {:id (str "MailMsg." (seqint2)) :source co :message msg }))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+(defn- connectPop3 "" [^Config co]
 
   (let [{:keys [^Session session
                 ^String proto]}
-        (.intern (.getx co))
+        @co
         {:keys [^String host
                 ^String user
                 port
@@ -140,37 +132,38 @@
                 host
                 ^long port
                 user
-                (stror (str passwd) nil))
-      (doto (.getx co)
-        (.setv :folder
-               (some-> (.getDefaultFolder s)
-                       (.getFolder "INBOX")))
-        (.setv :store s))
-      (let [fd (.getv (.getx co) :folder)]
+                (stror (strit passwd) nil))
+      (alterStateful
+        me
+        assoc
+        :store s
+        :folder (some-> (.getDefaultFolder s)
+                        (.getFolder "INBOX")))
+      (let [fd (:folder @me)]
         (when (or (nil? fd)
                   (not (.exists ^Folder fd)))
-          (.unsetv (.getx co) :store)
+          (alterStateful me dissoc :store)
           (try! (.close s))
           (throwIOE "cannot find inbox"))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- readPop3 "" [^Pluglet co msgs]
+(defn- readPop3 "" [^Config co msgs]
 
-  (let [d? (.getv (.getx co) :deleteMsg?)]
+  (let [d? (:deleteMsg? (.config co))]
     (doseq [^MimeMessage mm  msgs]
       (doto mm
         (.getAllHeaders)
         (.getContent))
-      (dispatch! (evt<> co {:msg mm}))
+      (dispatch! (evt<> co mm))
       (when d? (.setFlag mm Flags$Flag/DELETED true)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- scanPop3 "" [^Pluglet co]
+(defn- scanPop3 "" [co]
 
-  (let [{:keys [^Folder folder ^Store store]}
-        (.intern (.getx co))]
+  (let [{:keys [^Folder folder
+                ^Store store]} @co]
     (if (and folder
              (not (.isOpen folder)))
       (.open folder Folder/READ_WRITE))
@@ -186,7 +179,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- wake<o> "" [^Pluglet co]
+(defn- wake<o> "" [co]
 
   (try
     (connectPop3 co)
@@ -208,7 +201,7 @@
       (assoc :host (str host))
       (assoc :port (if (spos? port) port 995))
       (assoc :user (str user ))
-      (assoc :passwd (.text (passwd<> passwd pkey)))))
+      (assoc :passwd (text (passwd<> passwd pkey)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -227,41 +220,35 @@
           :delaySecs 0
           :ssl? true
           :handler nil}})
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn POP3Spec "" ^APersistentMap [] popspecdef)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn POP3 "" ^Pluggable
-
+(defn POP3 "" ^czlab.wabbit.xpis.Pluglet
   ([_ id] (POP3 _ id (POP3Spec)))
   ([_ id spec]
    (let
-     [{:keys [conf] :as pspec}
-      (update-in spec [:conf] expandVarsInForm)
-      impl (muble<>)]
-     (reify Pluggable
-       (setParent [_ p] (.setv impl :$parent p))
-       (parent [_] (.getv impl :$parent))
-       (config [_] (dissoc (.intern impl)
-                           :$funcs :$parent))
-       (spec [_] pspec)
-       (start [_ _]
-         ((:$start (.getv impl :$funcs)) (.intern impl)))
-       (stop [_]
-         ((:$stop (.getv impl :$funcs))))
-       (init [this arg]
-         (let [^Pluglet pg (.parent this)
-               k (.. pg server pkey)
-               c2 (merge conf (sanitize k arg))
-               [z p] (if (:ssl? c2)
-                       [cz-pop3s pop3s]
-                       [cz-pop3 pop3c])]
-           (->> (threadedTimer {:$wakeup #(wake<o> pg)})
-                (.setv impl :$funcs))
-           (.copyEx impl (prevarCfg c2))
-           (resolveProvider pg z p)))))))
+     [pspec (update-in spec
+                       [:conf] expandVarsInForm)
+      vtbl
+      {:config (fn [me] (:conf @me))
+       ;:start [_ _] ((:$start (.getv impl :$funcs)) (.intern impl)))
+       ;:stop [_] ((:$stop (.getv impl :$funcs))))
+       :init (fn [me arg]
+               (let [pg (.parent me)
+                     k (-> pg getServer pkeyChars)
+                     c0 (get-in @me [:pspec :conf])
+                     c2 (merge c0 (sanitize k arg))
+                     [z p] (if (:ssl? c2)
+                             [cz-pop3s pop3s] [cz-pop3 pop3c])]
+                 (->> (threadedTimer {:wakeup #(wake<o> pg)})
+                      (.setv impl :$funcs))
+                 (alterStateful me assoc :conf (prevarCfg c2))
+                 (resolveProvider pg z p)))}]
+     (pluglet<> pspec vtbl))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -307,35 +294,29 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn IMAP "" ^Pluggable
-
+(defn IMAP "" ^czlab.wabbit.xpis.Pluglet
   ([_ id] (IMAP _ id (IMAPSpec)))
   ([_ id spec]
    (let
-     [{:keys [conf] :as pspec}
-      (update-in spec [:conf] expandVarsInForm)
-      impl (muble<>)]
-     (reify Pluggable
-       (setParent [_ p] (.setv impl :$parent p))
-       (parent [_] (.getv impl :$parent))
-       (config [_] (dissoc (.intern impl)
-                           :$funcs :$parent))
-       (spec [_] pspec)
-       (start [_ _]
-         ((:$start (.getv impl :$funcs)) (.intern impl)))
-       (stop [_]
-         ((:$stop (.getv impl :$funcs))))
-       (init [this arg]
-         (let [^Pluglet pg (.parent this)
-               k (.. pg server pkey)
-               c2 (merge conf (sanitize k arg))
-               [z p] (if (:ssl? c2)
-                       [cz-imaps imaps]
-                       [cz-imap imap])]
-           (->> (threadedTimer {:$wakeup #(wake<i> pg)})
-                (.setv impl :$funcs))
-           (.copyEx impl (prevarCfg c2))
-           (resolveProvider pg z p)))))))
+     [pspec (update-in spec
+                       [:conf] expandVarsInForm)
+      vtbl
+      {:config (fn [me] (:conf @me))
+       ;;:start (fn [_ _] ((:$start (.getv impl :$funcs)) (.intern impl)))
+       ;;:stop (fn [_] ((:$stop (.getv impl :$funcs))))
+       :init (fn [me arg]
+               (let [pg (.parent me)
+                     k (-> pg getServer pkeyChars)
+                     c0 (get-in @me [:pspec :conf])
+                     c2 (merge c0 (sanitize k arg))
+                     [z p] (if (:ssl? c2)
+                             [cz-imaps imaps] [cz-imap imap])]
+                 (->> (threadedTimer {:wakeup #(wake<i> pg)})
+                      (.setv impl :$funcs))
+                 (alterStateful me
+                                assoc :conf (prevarCfg c2))
+                 (resolveProvider pg z p)))}]
+     (pluglet<> pspec vtbl))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF
