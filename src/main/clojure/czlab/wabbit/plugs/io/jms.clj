@@ -14,13 +14,12 @@
   (:require [czlab.twisty.codec :refer [passwd<>]]
             [czlab.basal.logging :as log])
 
-  (:use [czlab.wabbit.base.core]
+  (:use [czlab.wabbit.base]
         [czlab.basal.core]
         [czlab.basal.str]
         [czlab.wabbit.plugs.io.core])
 
   (:import [java.util Hashtable Properties ResourceBundle]
-           [czlab.wabbit.ctl Pluglet Pluggable]
            [javax.jms
             ConnectionFactory
             Connection
@@ -42,8 +41,7 @@
             TopicSubscriber]
            [java.io IOException]
            [clojure.lang APersistentMap]
-           [javax.naming Context InitialContext]
-           [czlab.wabbit.plugs.io JmsMsg]))
+           [javax.naming Context InitialContext]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;(set! *warn-on-reflection* true)
@@ -51,35 +49,33 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- evt<>
-  "" [co {:keys [msg]}]
+  "" [co msg]
 
-  (let [eeid (str "JmsMsg." (seqint2))
-        impl (muble<>)]
-    (reify JmsMsg
-      (id [_] eeid)
-      (source [_] co)
-      (message [_] msg))))
+  (object<> JmsMsg
+            {:id (str "JmsMsg." (seqint2))
+             :source co
+             :message msg }))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- onMsg "" [co msg]
   ;;if (msg!=null) block { () => msg.acknowledge() }
-  (dispatch! (evt<> co {:msg msg})))
+  (dispatch! (evt<> co msg)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- inizFac
   "" ^Connection
-  [^Pluggable co ^InitialContext ctx ^ConnectionFactory cf]
+  [^Config co ^InitialContext ctx ^ConnectionFactory cf]
 
   (let
     [{:keys [^String destination
              ^String jmsPwd
              ^String jmsUser]}
      (.config co)
-     ^Pluglet pg (.parent co)
-     pwd (->> (.server pg)
-              .pkey
+     pg (.parent ^Hierarchial co)
+     pwd (->> (getServer pg)
+              (pkeyChars)
               (passwd<> jmsPwd))
      c (.lookup ctx destination)
      ^Connection
@@ -103,7 +99,7 @@
 ;;
 (defn- inizTopic
   "" ^Connection
-  [^Pluggable co ^InitialContext ctx ^TopicConnectionFactory cf]
+  [^Config co ^InitialContext ctx ^TopicConnectionFactory cf]
 
   (let
     [{:keys [^String destination
@@ -111,9 +107,9 @@
              durable?
              ^String jmsPwd]}
      (.config co)
-     ^Pluglet pg (.parent co)
-     pwd (->> (.server pg)
-              .pkey
+     pg (.parent ^Hierarchial co)
+     pwd (->> (getServer pg)
+              (pkeyChars)
               (passwd<> jmsPwd))
      conn (if (hgl? jmsUser)
             (.createTopicConnection
@@ -138,16 +134,16 @@
 ;;
 (defn- inizQueue
   "" ^Connection
-  [^Pluggable co ^InitialContext ctx ^QueueConnectionFactory cf]
+  [^Config co ^InitialContext ctx ^QueueConnectionFactory cf]
 
   (let
     [{:keys [^String destination
              ^String jmsUser
              ^String jmsPwd]}
      (.config co)
-     ^Pluglet pg (.parent co)
-     pwd (->> (.server pg)
-              .pkey
+     pg (.parent ^Hierarchial co)
+     pwd (->> (getServer pg)
+              (pkeyChars)
               (passwd<> jmsPwd))
      conn (if (hgl? jmsUser)
             (.createQueueConnection
@@ -172,8 +168,8 @@
   ""
   [pkey {:keys [jndiPwd jmsPwd] :as cfg}]
 
-  (-> (assoc cfg :jndiPwd (.text (passwd<> jndiPwd pkey)))
-      (assoc :jmsPwd (.text (passwd<> jmsPwd pkey)))))
+  (-> (assoc cfg :jndiPwd (text (passwd<> jndiPwd pkey)))
+      (assoc :jmsPwd (text (passwd<> jmsPwd pkey)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -238,35 +234,48 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn JMS "" ^Pluggable
+(defentity JMSPlug
+
+  Pluggable
+  (pluggableSpec [_] (:$pspec @data))
+
+  Hierarchial
+  (setParent [_ p] (alterStateful me assoc :$parent p))
+  (parent [_] (:$parent @data))
+
+  Config
+  (config [_] (dissoc @data :$parent :$conn))
+
+  Initable
+  (init [me arg]
+   (let [pg (.parent me)
+         k (-> pg getServer pkeyChars)]
+     (alterStateful me
+                    merge
+                    (prevarCfg
+                      (merge (:conf @data)
+                             (sanitize k arg))))))
+
+  Startable
+  (start [me _]
+    (alterStateful me
+                   assoc
+                   :$conn (start2 me @data)))
+  (stop [_]
+    (when-some [c (:$conn @data)]
+      (try! (closeQ c)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+(defn JMS "" ^czlab.wabbit.xpis.Pluggable
 
   ([_ id] (JMS _ id (JMSSpec)))
   ([_ id spec]
-   (let
-     [{:keys [conf] :as pspec}
-      (update-in spec [:conf] expandVarsInForm)
-      impl (muble<>)]
-     (reify
-       Pluggable
-       (setParent [_ p] (.setv impl :$parent p))
-       (parent [_] (.getv impl :$parent))
-       (config [_] (dissoc (.intern impl)
-                           :$parent :$conn))
-       (spec [_] pspec)
-       (init [this arg]
-         (let [^Pluglet pg (.parent this)
-               k (.. pg server pkey)]
-           (.copyEx impl
-                    (prevarCfg
-                      (merge conf
-                         (sanitize k arg))))))
-       (start [this _]
-         (when-some [c (start2 this (.intern impl))]
-           (.setv impl :$conn c)))
-       (stop [_]
-         (when-some
-           [^Connection c (.unsetv impl :$conn)]
-           (try! (.close c))))))))
+   (let [{:keys [conf] :as pspec}
+         (update-in spec
+                    [:conf] expandVarsInForm)]
+     (entity<> JMSPlug
+               {:$pspec pspec :conf conf}))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF

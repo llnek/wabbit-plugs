@@ -16,15 +16,13 @@
             [czlab.basal.meta :refer [getCldr]]
             [czlab.basal.logging :as log])
 
-  (:use [czlab.wabbit.base.core]
+  (:use [czlab.wabbit.base]
         [czlab.basal.core]
         [czlab.basal.str]
         [czlab.wabbit.plugs.io.core])
 
-  (:import [czlab.wabbit.plugs.io TimerMsg]
-           [java.util Date Timer TimerTask]
-           [clojure.lang APersistentMap]
-           [czlab.wabbit.ctl Pluglet Pluggable]))
+  (:import [java.util Date Timer TimerTask]
+           [clojure.lang APersistentMap]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;(set! *warn-on-reflection* true)
@@ -93,38 +91,39 @@
      loopy (volatile! true)
      schedule
      (or (:$schedule funcs)
-         (fn [c]
+         (fn [co c]
            (async!
             #(while @loopy
-               (wake)
+               (wake co)
                (pause (:intervalMillis c)))
             {:cl (getCldr)})))]
     (doto
       {:$start
-       (fn [cfg]
+       (fn [co cfg]
          (let
            [{:keys [intervalSecs
                     delaySecs delayWhen]} cfg
-            func #(schedule {:intervalMillis
-                            (s2ms intervalSecs)})]
+            func #(schedule %1 {:intervalMillis
+                                (s2ms intervalSecs)})]
            (if (or (spos? delaySecs)
                    (ist? Date delayWhen))
              (configOnce (Timer.)
                          [delayWhen (s2ms delaySecs)] func)
-             (func))))
+             (func co))))
        :$stop
-       #(vreset! loopy false)})))
+       (fn [_] (vreset! loopy false))})))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+(defobject TimerMsg)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- evt<> ^TimerMsg [co repeat?]
-
-  (let [eeid (str "TimerMsg." (seqint2))]
-    (reify
-      TimerMsg
-      (id [_] eeid)
-      (source [_] co)
-      (isRepeating [_] repeat?))))
+(defn- evt<> [co repeat?]
+  (object<> TimerMsg
+            {:id (str "TimerMsg." (seqint2))
+             :source co
+             :isRepeating? repeat?} ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -151,35 +150,50 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
+(defentity xxxTimerPlug
+
+  Pluggable
+  (pluggableSpec [_] (:$pspec @data))
+
+  Hierarchial
+  (setParent [me p] (alterStateful me assoc :$parent p))
+  (parent [_] (:$parent @data))
+
+  Config
+  (config [_] (dissoc @data :$timer :$parent))
+
+  Initable
+  (init [_ arg]
+    (alterStateful me
+                   merge
+                   (prevarCfg (merge (:$conf @data) arg))))
+
+  Startable
+  (start [me arg]
+    (let [t (Timer. true)
+          pg (.parent me)
+          vt @data
+          w #(do (dispatch! (evt<> pg repeat?))
+                 (if-not repeat?
+                   (rvtbl vt :$stop me)))]
+      (alterStateful me assoc :$timer t)
+      (configTimer t w @data repeat?)))
+
+  (stop [me] (rvtbl @data :$stop me)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
 (defn- xxxTimer<> "" [spec repeat?]
 
-  (let
-    [{:keys [conf] :as tspec}
-     (update-in spec [:conf] expandVarsInForm)
-     impl (muble<>)
-     stop #(try!
-             (some-> ^Timer
-                     (.unsetv impl :$timer)
-                     .cancel))]
-    (reify
-      Pluggable
-      (setParent [_ p] (.setv impl :$parent p))
-      (parent [_] (.getv impl :$parent))
-      (config [_] (dissoc (.intern impl)
-                          :$timer :$parent))
-      (spec [_] tspec)
-      (init [_ arg]
-        (.copyEx impl (prevarCfg (merge conf arg))))
-      (start [this arg]
-        (let [t (doto->>
-                  (Timer. true)
-                  (.setv impl :$timer))
-              pg (.parent this)
-              w #(do (dispatch!
-                       (evt<> pg repeat?))
-                     (if-not repeat? (stop)))]
-          (configTimer t w (.intern impl) repeat?)))
-      (stop [_] (stop)))))
+  (let [{:keys [conf] :as pspec}
+        (update-in spec
+                   [:conf] expandVarsInForm)]
+    (entity<> TimerPlug
+              {:$stop #(try!
+                         (some-> ^Timer
+                                 (:$timer (.deref %1)) .cancel))
+               :$pspec pspec
+               :$conf conf})))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

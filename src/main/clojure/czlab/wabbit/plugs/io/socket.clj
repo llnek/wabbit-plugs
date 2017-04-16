@@ -19,7 +19,7 @@
   (:use [czlab.wabbit.plugs.io.core]
         [czlab.basal.core]
         [czlab.basal.str]
-        [czlab.wabbit.base.core])
+        [czlab.wabbit.base])
 
   (:import [java.net InetAddress ServerSocket Socket]
            [czlab.wabbit.ctl Pluglet Pluggable]
@@ -29,27 +29,30 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;(set! *warn-on-reflection* true)
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+(defobject TcpMsg
+  Disposable
+  (dispose [me]
+           (closeQ (:socket @me))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- evt<>
-  "" [co {:keys [^Socket socket]}]
-
-  (let [eeid (str "TcpMsg." (seqint2))]
-    (reify TcpMsg
-      (id [_] eeid)
-      (sockOut [_] (.getOutputStream socket))
-      (sockIn [_] (.getInputStream socket))
-      (source [_] co)
-      (dispose [_] (closeQ socket)))))
+  "" [co ^Socket socket]
+  (object<> TcpMsg
+            {:id (str "TcpMsg." (seqint2))
+             :sockOut (.getOutputStream socket)
+             :sockIn (.getInputStream socket)
+             :source co
+             :socket socket}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- sockItDown
-  "" [^Pluggable co soc]
-
+(defn- sockItDown "" [co soc]
   (try!
     (log/debug "opened socket: %s" soc)
-    (dispatch! (evt<> (.parent co) {:socket soc}))))
+    (dispatch! (evt<> co soc))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -86,39 +89,36 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn SocketIO "" ^Pluggable
+(defn SocketIO
+  "" ^czlab.wabbit.xpis.Pluglet
   ([_ id] (SocketIO _ id (SocketIOSpec)))
   ([_ id spec]
    (let
-     [{:keys [conf] :as pspec}
-      (update-in spec [:conf] expandVarsInForm)
-      impl (muble<>)]
-     (reify
-       Pluggable
-       (setParent [_ p] (.setv impl :$parent p))
-       (parent [_] (.getv impl :$parent))
-       (config [_] (dissoc (.intern impl)
-                           :$parent :$ssoc))
-       (spec [_] pspec)
-       (init [_ arg]
-         (.copyEx impl (prevarCfg (merge conf arg))))
-       (start [this _]
-         (when-some
-           [ss (ssoc<> (.intern impl))]
-           (.setv impl :$ssoc ss)
-           (async!
-             #(while (not (.isClosed ss))
-                (try
-                  (sockItDown this (.accept ss))
-                  (catch Throwable t
-                    (let [m (.getMessage t)]
-                      (if (and (hasNoCase? m "socket")
-                               (hasNoCase? m "closed"))
-                        nil
-                        (log/warn t ""))))))
-             {:cl (getCldr)})))
-       (stop [_]
-         (closeQ (.unsetv impl :$ssoc)))))))
+     [pspec (update-in spec
+                       [:conf] expandVarsInForm)
+      vtbl
+      {:config  (fn [me] (:conf @me))
+       :init (fn [me arg]
+               (->> (merge (get-in @me [:pspec :conf]) arg)
+                    prevarCfg
+                    (alterStateful me assoc :conf )))
+       :start (fn [me _]
+                (when-some
+                  [ss (ssoc<> (:conf @me))]
+                  (alterStateful me assoc :ssoc ss)
+                  (async!
+                    #(while (not (.isClosed ss))
+                       (try
+                         (sockItDown me (.accept ss))
+                         (catch Throwable t
+                           (let [m (.getMessage t)]
+                             (if-not (and (hasNoCase? m "socket")
+                                          (hasNoCase? m "closed"))
+                               (log/warn t ""))))))
+                    {:cl (getCldr)})))
+       :stop (fn [me]
+               (closeQ (:ssoc @me)))}]
+     (pluglet<> pspec vtbl))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF

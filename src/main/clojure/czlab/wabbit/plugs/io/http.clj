@@ -121,128 +121,83 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- resumeOnExpiry
-  "" [^Channel ch ^HttpMsg evt]
+  "" [^Channel ch evt]
   (try
-    (->> (httpResult<>
-           evt
-           HttpResponseStatus/INTERNAL_SERVER_ERROR)
-         (.writeAndFlush ch )
-         (maybeClose evt ))
+    (->> (httpResult ch evt HttpResponseStatus/INTERNAL_SERVER_ERROR)
+         (replyResult ch))
     (catch ClosedChannelException _
       (log/warn "channel closed already"))
     (catch Throwable t# (log/exception t#))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+(defobject WSockMsg WSockMsgGist)
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- wsockEvent<> "" [co ch msg]
-  (let
-    [body'
-     (-> (or (some->
-               (cast? BinaryWebSocketFrame msg)
-               .content
-               toByteArray)
-             (some->
-               (cast? TextWebSocketFrame msg) .text))
-         xdata<> )
-     ssl? (maybeSSL? ch)
-     eeid (str "WsockMsg." (seqint2))]
-    (reify WsockMsg
-      (isBinary [_] (instBytes? (.content body')))
-      (isText [_] (string? (.content body')))
-      (socket [_] ch)
-      (id [_] eeid)
-      (isSSL [_] ssl?)
-      (body [_] body')
-      (source [_] co))))
+  (object<> WSockMsg
+            (merge @msg
+                   {:id (str "WsockMsg." (seqint2))
+                    :socket ch
+                    :source co
+                    :ssl? (maybeSSL? ch) })))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+(defobject HttpEventObj
+  HttpMsgGist
+  Triggerable
+  (setTrigger [_ t]
+    (.setv (:impl data) :trigger t))
+  (cancel [_]
+    (some-> (.unsetv (:impl data) :trigger)
+            cancelTimerTask ))
+  (fire [me _]
+    (when-some [t (.unsetv (:impl data) :trigger)]
+      (.setv (:impl data) :stale? true)
+      (cancelTimerTask t)
+      (resumeOnExpiry (:socket data) me))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- httpEvent<>
-  "" ^HttpMsg [^Pluglet co
-               ^Channel ch ^WholeRequest req]
+(defn- httpEvent<> "" [^Config co ch req]
   (let
-    [^InetSocketAddress laddr (.localAddress ch)
-     body' (.content req)
-     gs (.gist req)
-     {:keys [wantSession? session]}
-     (.config co)
-     ^RouteInfo
-     ri (get-in gs [:route :info])
-     eeid (str "HttpMsg." (seqint2))
-     cookieJar (:cookies gs)
-     pkey (.. co server pkeyBytes)
-     s? (and (!false? wantSession?)
-             (some-> ri .wantSession))
-     wss (if s?
-           (->> (:macit? session)
-                (upstream pkey cookieJar)))
-     impl (muble<> {:$session wss :$stale? false})]
-    (reify HttpMsg
-
-      (session [_] (.getv impl :$session))
-      (id [_] eeid)
-      (source [_] co)
-      (socket [_] ch)
-
-      ;;:route {:redirect :status? :info :groups :places}
-      (routeGist [_] (:route gs))
-
-      (cookie [_ n] (get cookieJar n))
-      (cookies [_] (vals cookieJar))
-      (gist [_] gs)
-      (body [_] body')
-
-      (localAddr [_] (.. laddr getAddress getHostAddress))
-      (localHost [_] (. laddr getHostName))
-      (localPort [_] (. laddr getPort))
-
-      (remotePort [_]
-        (convLong (gistHeader gs "remote_port") 0))
-      (remoteAddr [_]
-        (str (gistHeader gs "remote_addr")))
-      (remoteHost [_]
-        (str (gistHeader gs "remote_host")))
-
-      (serverPort [_]
-        (convLong (gistHeader gs "server_port") 0))
-      (serverName [_]
-        (str (gistHeader gs "server_name")))
-
-      (setTrigger [_ t] (.setv impl :$trigger t))
-      (cancel [_]
-        (some-> (.unsetv impl :$trigger)
-                cancelTimerTask ))
-
-      (fire [this _]
-        (when-some [t (.unsetv impl :$trigger)]
-          (.setv impl :$stale? true)
-          (cancelTimerTask t)
-          (resumeOnExpiry ch this)))
-
-      (scheme [_] (if (:ssl? gs) "https" "http"))
-      (isStale [_] (.getv impl :$stale?))
-      (isSSL [_] (:ssl? gs))
-      (getx [_] impl))))
+    [{:keys [wantSession? session]} (.config co)
+     {:keys [route cookies]} @req]
+    (->>
+      {:session (if (and (!false? wantSession?)
+                         (some-> ^IDeref
+                                 (:info route)
+                                 .deref :wantSession?))
+                  (upstream (-> co getServer pkeyBytes)
+                            cookies
+                            (:macit? @session)))
+       :source co
+       :id (str "HttpMsg." (seqint2))
+       :impl (muble<> {:stale? false})}
+      (merge gist)
+      (object<> HttpEventObj))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- evt<>
   "" [co {:keys [ch msg]}]
-  (if
-    (ist? WebSocketFrame msg)
+  (cond
+    (satisfies? WSockMsgGist msg)
     (wsockEvent<> co ch msg)
+    (satisfies? HttpMsgGist msg)
     (httpEvent<> co ch msg)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- boot! "" [^Pluglet co]
-
+(defn- boot! "" [co]
   (let
     [asset! (with-open [clj (Cljrt/newrt (getCldr))]
               (.varIt clj
                       "czlab.wabbit.plugs.io.mvc/asset!"))
      {:keys [waitMillis] :as cfg}
-     (.config co)
+     (.config ^Config co)
      bs
      (createServer<>
        :netty/http
@@ -251,31 +206,27 @@
           (proxy [InboundHandler][]
             (channelRead0 [ctx msg]
               (let
-                [ev (evt<> co {:msg msg
-                               :ch (ch?? ctx)})
-                 ^RouteInfo
-                 ri (some-> (cast? HttpMsg ev)
-                            .routeGist
-                            :info)
-                 s? (some-> ri .isStatic)
-                 hd (some-> ri .handler)
-                 hd (if (and s? (nil? hd)) asset! hd)]
+                [ev (evt<> co msg)
+                 {:keys [static? handler]}
+                 (some-> ^IDeref
+                         (:info (:route @ev)) .deref)
+                 hd (if (and static?
+                             (nil? handler)) asset! handler)]
                 (if (spos? waitMillis)
-                  (.hold co ev waitMillis))
+                  (holdEvent co ev waitMillis))
                 (dispatch! ev {:handler hd}))))}) cfg)]
     [bs (startServer bs cfg)]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn processOrphan
-  "" [^Job job error]
+  "" [job error]
   ;; 500 or 503
-  (let [s (or (.getv job :statusCode) 500)
-        ^HttpMsg evt (.origin job)]
-    (-> (httpResult<>
-          evt
-          (HttpResponseStatus/valueOf s))
-        (replyResult ))))
+  (let [s (or (:statusCode @job) 500)
+        evt (rootage job)
+        ch (socket evt)]
+    (->> (httpResult ch evt s)
+         (replyResult ch ))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -303,7 +254,7 @@
     (->>
       {:port (if-not (spos? port) (if ssl? 443 80) port)
        :routes (maybeLoadRoutes cfg)
-       :passwd (.text (passwd<> passwd pkey))
+       :passwd (text (passwd<> passwd pkey))
        :serverKey (if ssl? (io/as-url serverKey))}
       (merge cfg ))))
 
@@ -355,50 +306,54 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- httpXXX<>
-  "" [{:keys [conf] :as pspec}]
+(defentity HTTPServerObj
+  Pluggable
+  (pluggableSpec [_] (:$pspec @data))
 
-  (let
-    [impl (muble<>)]
-    (reify Pluggable
-      (setParent [_ p] (.setv impl :$parent p))
-      (parent [_] (.getv impl :$parent))
-      (config [_] (dissoc (.intern impl)
-                          :$parent :$boot :$chan))
-      (spec [_] (.getv impl :$pspec))
-      (init [this arg]
-        (let [^Pluglet pg (.parent this)
-              h (.. pg server homeDir)
-              k (.. pg server pkey)
-              {{:keys [publicRootDir pageDir]}
-               :wsite
-               {:keys [webAuth?]}
-               :session
-               :as cfg}
-              (basicConfig k conf arg)
-              pub (io/file (str publicRootDir)
-                           (str pageDir))]
-          (.copyEx impl (prevarCfg cfg))
-          (->> (if webAuth?
-                 (assoc pspec
-                        :deps
-                        {:$auth [:czlab.wabbit.plugs.auth.core/WebAuth]})
-                 pspec)
-               (.setv impl :$pspec))
-          (when (dirReadWrite? pub)
-            (log/debug "freemarker tpl root: %s" (fpath pub))
-            (.setv impl
-                   :$ftlCfg
-                   (mvc/genFtlConfig {:root pub})))))
-      (start [this _]
-        (let [[bs ch] (boot! (.parent this))]
-          (.setv impl :$boot bs)
-          (.setv impl :$chan ch)))
-      (stop [_]
-        (when-some
-          [c (.unsetv impl :$chan)]
-          (stopServer c))
-        (.unsetv impl :$boot)))))
+  Hierarchial
+  (setParent [me p] (alterStateful me assoc :$parent p))
+  (parent [_] (:$parent @data))
+
+  Config
+  (config [_] (dissoc @data :$parent :$boot :$chan))
+
+  Initable
+  (init [me arg]
+    (let [pg (.parent me)
+          h (-> pg getServer getHomeDir)
+          k (-> pg getServer pkeyChars)
+          {{:keys [publicRootDir pageDir]}
+           :wsite
+           {:keys [webAuth?]}
+           :session
+           :as cfg}
+          (basicConfig k conf arg)
+          pub (io/file (str publicRootDir)
+                       (str pageDir))]
+      (alterStateful me merge (prevarCfg cfg))
+      (if webAuth?
+        (alterStateful me
+                       update-in
+                       [@pspec]
+                       assoc
+                       :deps
+                       {:$auth [:czlab.wabbit.plugs.auth.core/WebAuth]}))
+      (when (dirReadWrite? pub)
+        (log/debug "freemarker tpl root: %s" (fpath pub))
+        (alterStateful me
+                       assoc
+                       :$ftlCfg
+                       (mvc/genFtlConfig {:root pub})))))
+  Startable
+  (start [me _]
+    (let [[bs ch] (boot! (.parent me))]
+      (alterStateful me
+                     assoc
+                     :$boot bs :$chan ch)))
+  (stop [me]
+    (let [{:keys [$chan $boot]} @data]
+      (some-> $chan stopServer)
+      (alterStateful me dissoc $chan $boot))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -406,10 +361,14 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn HTTP "" ^Pluggable
+(defn HTTP "" ^czlab.wabbit.xpis.Pluggable
   ([_ id] (HTTP _ id (HTTPSpec)))
   ([_ id spec]
-   (httpXXX<> (update-in spec [:conf] expandVarsInForm))))
+   (let [{:keys [conf] :as pspec}
+         (update-in spec
+                    [:conf] expandVarsInForm)]
+     (entity<> HTTPServerObj
+               {:$pspec pspec :conf conf}))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF
