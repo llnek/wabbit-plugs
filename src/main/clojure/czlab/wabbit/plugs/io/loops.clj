@@ -83,35 +83,30 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn threadedTimer "" [funcs]
+(defn threadedVtbl "" []
 
   (let
-    [wake (or (:$wakeup funcs)
-              (constantly nil))
-     loopy (volatile! true)
-     schedule
-     (or (:$schedule funcs)
-         (fn [co c]
-           (async!
-            #(while @loopy
-               (wake co)
-               (pause (:intervalMillis c)))
-            {:cl (getCldr)})))]
-    (doto
-      {:$start
-       (fn [co cfg]
-         (let
-           [{:keys [intervalSecs
-                    delaySecs delayWhen]} cfg
-            func #(schedule %1 {:intervalMillis
-                                (s2ms intervalSecs)})]
-           (if (or (spos? delaySecs)
-                   (ist? Date delayWhen))
-             (configOnce (Timer.)
-                         [delayWhen (s2ms delaySecs)] func)
-             (func co))))
-       :$stop
-       (fn [_] (vreset! loopy false))})))
+    [loopy (volatile! true)]
+    {:start
+     (fn [vt co cfg]
+       (let [{:keys [intervalSecs
+                     delaySecs delayWhen]} cfg
+             func #(rvtbl vt :schedule co {:intervalMillis
+                                           (s2ms intervalSecs)})]
+         (if (or (spos? delaySecs)
+                 (ist? Date delayWhen))
+           (configOnce (Timer.)
+                       [delayWhen (s2ms delaySecs)] func)
+           (func))))
+     :schedule
+     (fn [vt co c]
+       (async!
+         #(while @loopy
+            (rvtbl vt :wake co)
+            (pause (:intervalMillis c)))
+         {:cl (getCldr)}))
+     :wake (constantly nil)
+     :stop (fn [_] (vreset! loopy false))}
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -122,6 +117,7 @@
 (defn- evt<> [co repeat?]
   (object<> TimerMsg
             {:id (str "TimerMsg." (seqint2))
+             :tstamp (now<>)
              :source co
              :isRepeating? repeat?} ))
 
@@ -150,50 +146,30 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defentity xxxTimerPlug
-
-  Pluggable
-  (pluggableSpec [_] (:$pspec @data))
-
-  Hierarchial
-  (setParent [me p] (alterStateful me assoc :$parent p))
-  (parent [_] (:$parent @data))
-
-  Config
-  (config [_] (dissoc @data :$timer :$parent))
-
-  Initable
-  (init [_ arg]
-    (alterStateful me
-                   merge
-                   (prevarCfg (merge (:$conf @data) arg))))
-
-  Startable
-  (start [me arg]
-    (let [t (Timer. true)
-          pg (.parent me)
-          vt @data
-          w #(do (dispatch! (evt<> pg repeat?))
-                 (if-not repeat?
-                   (rvtbl vt :$stop me)))]
-      (alterStateful me assoc :$timer t)
-      (configTimer t w @data repeat?)))
-
-  (stop [me] (rvtbl @data :$stop me)))
+(defn- cancelTimer "" [^Timer t] (try! (some-> t .cancel)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- xxxTimer<> "" [spec repeat?]
 
-  (let [{:keys [conf] :as pspec}
-        (update-in spec
-                   [:conf] expandVarsInForm)]
-    (entity<> TimerPlug
-              {:$stop #(try!
-                         (some-> ^Timer
-                                 (:$timer (.deref %1)) .cancel))
-               :$pspec pspec
-               :$conf conf})))
+  (let
+    [pspec (update-in spec
+                      [:conf] expandVarsInForm)
+     vtbl
+     {:config (fn [me] (:conf @me))
+      :init (fn [me arg]
+              (let [c (get-in @me [:pspec :conf])]
+                (alterStateful
+                  me merge (prevarCfg (merge c arg)))))
+      :start (fn [me arg]
+               (let [t (Timer. true)
+                     cfg (.config me)
+                     w #(do (dispatch! (evt<> me repeat?))
+                            (if-not repeat? (cancelTimer t)))]
+                 (alterStateful me assoc :timer t)
+                 (configTimer t w cfg repeat?)))
+      :stop (fn [me] (cancelTimer (:timer @me)))}]
+    (pluglet<> pspec vtbl)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

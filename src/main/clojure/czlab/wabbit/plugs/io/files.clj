@@ -153,38 +153,28 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defentity FilePickerObj
+(defn xxx "" []
 
-  Pluggable
-  (pluggableSpec [_] (:pspec @data))
-
-  Hierarchial
-  (setParent [me p] (alterStateful me assoc :$parent p))
-  (parent [_] (:$parent @data))
-
-  Config
-  (config [_] (dissoc @data :$mon :$funcs :$parent))
-
-  Initable
-  (init [me arg]
-    (let [{:keys [conf sch]} @data]
-      (alterStateful me
-                     merge
-                     (prevarCfg (init2 conf arg)))
-      (->> (threadedTimer {:$schedule sch})
-           (alterStateful me assoc :$funcs))))
-
-  Startable
-  (start [me _]
-    (let [{:keys [$funcs] :as cfg} @data
-          starter (:$start $funcs)]
-      (alterStateful me assoc :$mon (fileMon<> me cfg))
-      (starter cfg)))
-  (stop [me]
-    (let [m (:$mon @data)]
-      (alterStateful me dissoc :$mon)
-      (log/info "apache io monitor stopping...")
-      (some-> ^FileAlterationMonitor m ,stop))))
+  (let
+    [pspec (update-in )
+     tt (threadedVtbl)
+     vtbl
+     {:config (fn [vt me] (:conf @me))
+      :init (fn [vt me arg]
+              (let [c (get-in @me [:pspec :conf])]
+                (alterStateful
+                  me update-in [:conf] (prevarCfg (init2 c arg)))))
+      :start (fn [vt me _]
+               (->> (.config me)
+                    (fileMon<> me)
+                    (alterStateful me assoc :mon))
+               (rvtbl' vt :start _))
+      :stop (fn [vt me]
+              (let [m (:mon @me)]
+                (alterStateful me dissoc :mon)
+                (log/info "apache io monitor stopping...")
+                (some-> ^FileAlterationMonitor m .stop)))}]
+    (pluglet<> pspec vtbl)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
