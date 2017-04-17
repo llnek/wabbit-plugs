@@ -153,48 +153,35 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn xxx "" []
-
-  (let
-    [pspec (update-in )
-     tt (threadedVtbl)
-     vtbl
-     {:config (fn [vt me] (:conf @me))
-      :init (fn [vt me arg]
-              (let [c (get-in @me [:pspec :conf])]
-                (alterStateful
-                  me update-in [:conf] (prevarCfg (init2 c arg)))))
-      :start (fn [vt me _]
-               (->> (.config me)
-                    (fileMon<> me)
-                    (alterStateful me assoc :mon))
-               (rvtbl' vt :start _))
-      :stop (fn [vt me]
-              (let [m (:mon @me)]
-                (alterStateful me dissoc :mon)
-                (log/info "apache io monitor stopping...")
-                (some-> ^FileAlterationMonitor m .stop)))}]
-    (pluglet<> pspec vtbl)))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-(defn FilePicker "" ^czlab.wabbit.xpis.Pluggable
+(defn FilePicker "" ^czlab.wabbit.xpis.Pluglet
 
   ([_ id] (FilePicker _ id (FilePickerSpec)))
   ([_ id spec]
    (let
-     [{:keys [conf] :as pspec}
-      (update-in spec
-                 [:conf]
-                 expandVarsInForm)
-      ^Stateful
-      ent (entity<> FilePickerObj
-                    {:pspec pspec :conf conf})
-      sch #(let [_ %
-                 data (.state ent)]
-             (log/info "apache io monitor starting...")
-             (some-> ^FileAlterationMonitor (:$mon @data) .start))]
-     (alterStateful ent assoc :sch sch))))
+     [pspec (update-in spec
+                       [:conf] expandVarsInForm)
+      vtbl
+      {:schedule (fn [vt me]
+                   (log/info "apache io monitor starting...")
+                   (some-> ^FileAlterationMonitor (:mon @me) .start))
+       :init (fn [vt me arg]
+               (let [c (get-in @me [:pspec :conf])]
+                 (alterStateful
+                   me update-in [:conf] (prevarCfg (init2 c arg)))))
+       :start (fn [vt me _]
+                (->> (.config ^Config me)
+                     (fileMon<> me)
+                     (alterStateful me assoc :mon))
+                (rvtbl' vt :start _))
+       :stop (fn [vt me]
+               (let [m (:mon @me)]
+                 (alterStateful me dissoc :mon)
+                 (log/info "apache io monitor stopping...")
+                 (some-> ^FileAlterationMonitor m .stop)))}]
+
+     (pluglet<> pspec
+                (svtbl vtbl
+                       (threadedVtbl))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF
