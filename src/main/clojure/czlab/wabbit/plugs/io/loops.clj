@@ -31,12 +31,10 @@
 ;;
 (defn- configRepeat
   ""
-  [^Timer timer delays ^long intv func]
+  [^Timer timer [dw ds] ^long intv func]
 
   (log/info "Scheduling a *repeating* timer: %dms" intv)
-  (let
-    [tt (tmtask<> func)
-     [dw ds] delays]
+  (let [tt (tmtask<> func)]
     (if (spos? intv)
       (cond
         (ist? Date dw)
@@ -44,25 +42,23 @@
         :else
         (.schedule timer
                    tt
-                   (long (if (> ds 0) ds 1000)) intv)))))
+                   (long (if (spos? ds) ds 1000)) intv)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- configOnce
   ""
-  [^Timer timer delays func]
+  [^Timer timer [dw ds] func]
 
-  (log/info "Scheduling a *one-shot* timer at %s" delays)
-  (let
-    [tt (tmtask<> func)
-     [dw ds] delays]
+  (log/info "Scheduling a *one-shot* timer at %s" [dw ds])
+  (let [tt (tmtask<> func)]
     (cond
       (ist? Date dw)
       (.schedule timer tt ^Date dw)
       :else
       (.schedule timer
                  tt
-                 (long (if (> ds 0) ds 1000))))))
+                 (long (if (spos? ds) ds 1000))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -70,10 +66,8 @@
   [timer wakeup {:keys [intervalSecs
                         delayWhen
                         delaySecs] :as cfg} repeat?]
-
-  (let
-    [d [delayWhen (s2ms delaySecs)]]
-    (test-some "java-timer" timer)
+  {:pre [(some? timer)]}
+  (let [d [delayWhen (s2ms delaySecs)]]
     (if (and repeat?
              (spos? intervalSecs))
       (configRepeat timer
@@ -83,6 +77,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
+<<<<<<< HEAD
 (defn threadedVtbl "" []
 
   (let
@@ -107,6 +102,33 @@
          {:cl (getCldr)}))
      :wake (constantly nil)
      :stop (fn [_] (vreset! loopy false))}
+=======
+(defn threadedTimer "" [funcs]
+  (let
+    [wake (or (:wakeup funcs) (constantly nil))
+     loopy (volatile! true)
+     schedule
+     (or (:schedule funcs)
+         (fn [co c]
+           (async!
+            #(while @loopy
+               (wake co)
+               (pause (:intervalMillis c)))
+            {:cl (getCldr)})))]
+    {:start
+     (fn [co cfg]
+       (let [{:keys [intervalSecs
+                     delaySecs delayWhen]} cfg
+             func #(schedule %1 {:intervalMillis
+                                (s2ms intervalSecs)})]
+           (if (or (spos? delaySecs)
+                   (ist? Date delayWhen))
+             (configOnce (Timer.)
+                         [delayWhen (s2ms delaySecs)] func)
+             (func co))))
+       :stop
+       (fn [_] (vreset! loopy false))}))
+>>>>>>> 60cbd957690818fbfff04e68c59ea4623eed7a54
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -152,6 +174,7 @@
 ;;
 (defn- xxxTimer<> "" [spec repeat?]
 
+<<<<<<< HEAD
   (let
     [pspec (update-in spec
                       [:conf] expandVarsInForm)
@@ -170,6 +193,14 @@
                  (configTimer t w cfg repeat?)))
       :stop (fn [me] (cancelTimer (:timer @me)))}]
     (pluglet<> pspec vtbl)))
+=======
+  (let [pspec (update-in spec
+                         [:conf] expandVarsInForm)
+        vtbl
+        {:stop #(try! (some-> ^Timer
+                              (:timer (.deref %1)) .cancel))}]
+    (object<> TimerMsg vbtl)))
+>>>>>>> 60cbd957690818fbfff04e68c59ea4623eed7a54
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -177,8 +208,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn RepeatingTimer "" ^Pluggable
-
+(defn RepeatingTimer "" ^czlab.wabbit.xpis.Pluglet
   ([_ id] (RepeatingTimer _ id (RepeatingTimerSpec)))
   ([_ id spec] (xxxTimer<> spec true)))
 
@@ -188,7 +218,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn OnceTimer "" ^Pluggable
+(defn OnceTimer "" ^czlab.wabbit.xpis.Pluglet
 
   ([_ id] (OnceTimer _ id (OnceTimerSpec)))
   ([_ id spec] (xxxTimer<> spec false)))
