@@ -48,7 +48,7 @@
 (def ^:private cz-pop3s  "com.sun.mail.pop3.POP3SSLStore")
 (def ^:private cz-pop3  "com.sun.mail.pop3.POP3Store")
 (def ^:private pop3s "pop3s")
-(def ^:private pop3c "pop3")
+(def ^:private pop3 "pop3")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; IMAP
@@ -179,7 +179,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- wake<o> "" [co]
+(defn- wakePOP3 "" [co]
 
   (try
     (connectPop3 co)
@@ -227,28 +227,20 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn POP3 "" ^czlab.wabbit.xpis.Pluglet
-  ([_ id] (POP3 _ id (POP3Spec)))
-  ([_ id spec]
-   (let
-     [pspec (update-in spec
-                       [:conf] expandVarsInForm)
-      vtbl
-      {:config (fn [me] (:conf @me))
-       ;:start [_ _] ((:$start (.getv impl :$funcs)) (.intern impl)))
-       ;:stop [_] ((:$stop (.getv impl :$funcs))))
-       :init (fn [me arg]
-               (let [pg (.parent me)
-                     k (-> pg getServer pkeyChars)
-                     c0 (get-in @me [:pspec :conf])
-                     c2 (merge c0 (sanitize k arg))
-                     [z p] (if (:ssl? c2)
-                             [cz-pop3s pop3s] [cz-pop3 pop3c])]
-                 (->> (threadedTimer {:wakeup #(wake<o> pg)})
-                      (.setv impl :$funcs))
-                 (alterStateful me assoc :conf (prevarCfg c2))
-                 (resolveProvider pg z p)))}]
-     (pluglet<> pspec vtbl))))
+(defn- emailXXX "" [id spec sslvars vars waker]
+  {:pspec (update-in spec
+                     [:conf] expandVarsInForm)
+   :wake waker
+   :id id
+   :init
+   (fn [me arg]
+     (let [c (:info (rvtbl (:vtbl @me) :pspec))
+           k (-> me getServer pkeyChars)
+           c2 (prevarCfg (merge c
+                                (sanitize k arg)))]
+       (->> (if (:ssl? c2) sslvars vars)
+            (resolveProvider me))
+       c2))})
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -260,7 +252,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- wake<i> "" [co]
+(defn- wakeIMAP "" [co]
 
   (try
     (connectIMAP co)
@@ -297,26 +289,14 @@
 (defn IMAP "" ^czlab.wabbit.xpis.Pluglet
   ([_ id] (IMAP _ id (IMAPSpec)))
   ([_ id spec]
-   (let
-     [pspec (update-in spec
-                       [:conf] expandVarsInForm)
-      vtbl
-      {:config (fn [me] (:conf @me))
-       ;;:start (fn [_ _] ((:$start (.getv impl :$funcs)) (.intern impl)))
-       ;;:stop (fn [_] ((:$stop (.getv impl :$funcs))))
-       :init (fn [me arg]
-               (let [pg (.parent me)
-                     k (-> pg getServer pkeyChars)
-                     c0 (get-in @me [:pspec :conf])
-                     c2 (merge c0 (sanitize k arg))
-                     [z p] (if (:ssl? c2)
-                             [cz-imaps imaps] [cz-imap imap])]
-                 (->> (threadedTimer {:wakeup #(wake<i> pg)})
-                      (.setv impl :$funcs))
-                 (alterStateful me
-                                assoc :conf (prevarCfg c2))
-                 (resolveProvider pg z p)))}]
-     (pluglet<> pspec vtbl))))
+   (emailXXX id spec [cz-imaps imaps] [cz-imap imap] wakeIMAP)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+(defn POP3 "" ^APersistentMap
+  ([_ id] (POP3 _ id (POP3Spec)))
+  ([_ id spec]
+   (emailXXX id spec [cz-pop3s pop3s] [cz-pop3 pop3] wakePOP3)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF

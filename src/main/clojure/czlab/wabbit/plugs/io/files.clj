@@ -153,35 +153,30 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn FilePicker "" ^czlab.wabbit.xpis.Pluglet
+(defn FilePicker "" ^APersistentMap
 
   ([_ id] (FilePicker _ id (FilePickerSpec)))
   ([_ id spec]
-   (let
-     [pspec (update-in spec
-                       [:conf] expandVarsInForm)
-      vtbl
-      {:schedule (fn [vt me]
-                   (log/info "apache io monitor starting...")
-                   (some-> ^FileAlterationMonitor (:mon @me) .start))
-       :init (fn [vt me arg]
-               (let [c (get-in @me [:pspec :conf])]
-                 (alterStateful
-                   me update-in [:conf] (prevarCfg (init2 c arg)))))
-       :start (fn [vt me _]
-                (->> (.config ^Config me)
-                     (fileMon<> me)
-                     (alterStateful me assoc :mon))
-                (rvtbl' vt :start _))
-       :stop (fn [vt me]
-               (let [m (:mon @me)]
-                 (alterStateful me dissoc :mon)
-                 (log/info "apache io monitor stopping...")
-                 (some-> ^FileAlterationMonitor m .stop)))}]
-
-     (pluglet<> pspec
-                (svtbl vtbl
-                       (threadedVtbl))))))
+   {:pspec (update-in spec
+                      [:conf] expandVarsInForm)
+    :schedule
+    (fn [me _]
+      (let [mon (fileMon<> me
+                           (.config ^Config me))]
+        (log/info "apache io monitor starting...")
+        (alterPluglet me :mon mon)
+        (.start mon)))
+    :init
+    (fn [me arg]
+      (-> (:info (rvtbl (:vtbl @me) :pspec))
+          (init2  arg)
+          (prevarCfg )))
+    :stop
+    (fn [me]
+      (let [^FileAlterationMonitor
+            m (alterPluglet- me :mon)]
+        (log/info "apache io monitor stopping...")
+        (.stop m)))}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF

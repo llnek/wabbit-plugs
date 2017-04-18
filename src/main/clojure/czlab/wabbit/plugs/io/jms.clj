@@ -234,48 +234,23 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defentity JMSPlug
-
-  Pluggable
-  (pluggableSpec [_] (:$pspec @data))
-
-  Hierarchial
-  (setParent [_ p] (alterStateful me assoc :$parent p))
-  (parent [_] (:$parent @data))
-
-  Config
-  (config [_] (dissoc @data :$parent :$conn))
-
-  Initable
-  (init [me arg]
-   (let [pg (.parent me)
-         k (-> pg getServer pkeyChars)]
-     (alterStateful me
-                    merge
-                    (prevarCfg
-                      (merge (:conf @data)
-                             (sanitize k arg))))))
-
-  Startable
-  (start [me _]
-    (alterStateful me
-                   assoc
-                   :$conn (start2 me @data)))
-  (stop [_]
-    (when-some [c (:$conn @data)]
-      (try! (closeQ c)))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-(defn JMS "" ^czlab.wabbit.xpis.Pluggable
-
+(defn JMS "" ^APersistentMap
   ([_ id] (JMS _ id (JMSSpec)))
   ([_ id spec]
-   (let [{:keys [conf] :as pspec}
-         (update-in spec
-                    [:conf] expandVarsInForm)]
-     (entity<> JMSPlug
-               {:$pspec pspec :conf conf}))))
+   {:pspec (update-in spec [:conf] expandVarsInForm)
+    :init (fn [me arg]
+            (let [pg (.parent ^Hierarchial me)
+                  c (-> (:vtbl @me)
+                        (rvtbl :pspec) :conf)
+                  k (-> pg getServer pkeyChars)]
+              (prevarCfg (merge c (sanitize k arg)))))
+    :start (fn [me _]
+             (-> (.config me)
+                 (start2 me)
+                 (alterPluglet+ me :$conn)))
+    :stop (fn [me]
+            (when-some [c (plugletVar me :$conn)]
+              (try! (closeQ c))))}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF

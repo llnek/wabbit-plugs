@@ -238,7 +238,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- basicConfig
+(defn- basicfg
 
   "Basic http config"
   [pkey conf cfg0]
@@ -263,7 +263,8 @@
 (def
   ^:private
   httpspecdef
-  {:eror :czlab.wabbit.plugs.io.http/processOrphan
+  {:deps {:$auth [:czlab.wabbit.plugs.auth.core/WebAuth]}
+   :eror :czlab.wabbit.plugs.io.http/processOrphan
    :info {:name "Web Site"
           :version "1.0.0"}
    :conf {:maxInMemory (* 1024 1024 4)
@@ -306,69 +307,41 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defentity HTTPServerObj
-  Pluggable
-  (pluggableSpec [_] (:$pspec @data))
-
-  Hierarchial
-  (setParent [me p] (alterStateful me assoc :$parent p))
-  (parent [_] (:$parent @data))
-
-  Config
-  (config [_] (dissoc @data :$parent :$boot :$chan))
-
-  Initable
-  (init [me arg]
-    (let [pg (.parent me)
-          h (-> pg getServer getHomeDir)
-          k (-> pg getServer pkeyChars)
-          {{:keys [publicRootDir pageDir]}
-           :wsite
-           {:keys [webAuth?]}
-           :session
-           :as cfg}
-          (basicConfig k conf arg)
-          pub (io/file (str publicRootDir)
-                       (str pageDir))]
-      (alterStateful me merge (prevarCfg cfg))
-      (if webAuth?
-        (alterStateful me
-                       update-in
-                       [@pspec]
-                       assoc
-                       :deps
-                       {:$auth [:czlab.wabbit.plugs.auth.core/WebAuth]}))
-      (when (dirReadWrite? pub)
-        (log/debug "freemarker tpl root: %s" (fpath pub))
-        (alterStateful me
-                       assoc
-                       :$ftlCfg
-                       (mvc/genFtlConfig {:root pub})))))
-  Startable
-  (start [me _]
-    (let [[bs ch] (boot! (.parent me))]
-      (alterStateful me
-                     assoc
-                     :$boot bs :$chan ch)))
-  (stop [me]
-    (let [{:keys [$chan $boot]} @data]
-      (some-> $chan stopServer)
-      (alterStateful me dissoc $chan $boot))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
 (defn HTTPSpec "" ^APersistentMap [] httpspecdef)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn HTTP "" ^czlab.wabbit.xpis.Pluggable
+(defn HTTP "" ^APersistentMap
   ([_ id] (HTTP _ id (HTTPSpec)))
   ([_ id spec]
-   (let [{:keys [conf] :as pspec}
-         (update-in spec
-                    [:conf] expandVarsInForm)]
-     (entity<> HTTPServerObj
-               {:$pspec pspec :conf conf}))))
+   {:pspec (update-in spec
+                      [:conf] expandVarsInForm)
+    :init
+    (fn [me arg]
+      (let [c (:info (rvtbl (:vtbl @me) :pspec))
+            ;;h (-> me getServer getHomeDir)
+            k (-> me getServer pkeyChars)
+            cfg (prevarCfg (basicfg k c arg))
+            {:keys [publicRootDir pageDir]}
+            (:wsite cfg)
+            pub (io/file (str publicRootDir)
+                         (str pageDir))]
+        (when (dirReadWrite? pub)
+          (log/debug "freemarker tpl root: %s" (fpath pub))
+          (alterPluglet+ me
+                         :ftlCfg
+                         (mvc/genFtlConfig {:root pub})))
+        cfg))
+    :start
+    (fn [me _]
+      (let [[bs ch] (boot! me)]
+        (alterPluglet+ me :boot bs)
+        (alterPluglet+ me :chan ch)))
+    :stop
+    (fn [me]
+      (let [{:keys [chan boot]}
+            (.intern (:impl @me))]
+        (some-> chan stopServer)))}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF

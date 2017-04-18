@@ -31,42 +31,47 @@
 ;;
 (defn- configRepeat
   ""
+  ^TimerTask
   [^Timer timer [dw ds] ^long intv func]
 
   (log/info "Scheduling a *repeating* timer: %dms" intv)
   (let [tt (tmtask<> func)]
     (if (spos? intv)
-      (cond
+      (if
         (ist? Date dw)
         (.schedule timer tt ^Date dw intv)
-        :else
+        ;else
         (.schedule timer
                    tt
-                   (long (if (spos? ds) ds 1000)) intv)))))
+                   (long (if (spos? ds) ds 1000)) intv)))
+    tt))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- configOnce
   ""
+  ^TimerTask
   [^Timer timer [dw ds] func]
 
   (log/info "Scheduling a *one-shot* timer at %s" [dw ds])
   (let [tt (tmtask<> func)]
-    (cond
+    (if
       (ist? Date dw)
       (.schedule timer tt ^Date dw)
-      :else
+      ;else
       (.schedule timer
                  tt
-                 (long (if (spos? ds) ds 1000))))))
+                 (long (if (spos? ds) ds 1000))))
+    tt))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- configTimer
+  ""
+  ^TimerTask
   [timer wakeup {:keys [intervalSecs
                         delayWhen
                         delaySecs] :as cfg} repeat?]
-  {:pre [(some? timer)]}
   (let [d [delayWhen (s2ms delaySecs)]]
     (if (and repeat?
              (spos? intervalSecs))
@@ -77,58 +82,26 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-<<<<<<< HEAD
-(defn threadedVtbl "" []
-
-  (let
-    [loopy (volatile! true)]
+(defn threadedTimer "" ^APersistentMap []
+  (let [loopy (volatile! true)]
     {:start
-     (fn [vt co cfg]
-       (let [{:keys [intervalSecs
-                     delaySecs delayWhen]} cfg
-             func #(rvtbl vt :schedule co {:intervalMillis
-                                           (s2ms intervalSecs)})]
+     (fn [me cfg]
+       (let [{:keys [intervalSecs delaySecs delayWhen]} cfg
+             f #(rvtbl (:vtbl @me) :schedule me (s2ms intervalSecs))]
          (if (or (spos? delaySecs)
                  (ist? Date delayWhen))
            (configOnce (Timer.)
-                       [delayWhen (s2ms delaySecs)] func)
-           (func))))
+                       [delayWhen (s2ms delaySecs)] f)
+           (f))))
      :schedule
-     (fn [vt co c]
+     (fn [me millis]
        (async!
          #(while @loopy
-            (rvtbl vt :wake co)
-            (pause (:intervalMillis c)))
+            (rvtbl (:vtbl @me) :wake me)
+            (pause millis))
          {:cl (getCldr)}))
      :wake (constantly nil)
-     :stop (fn [_] (vreset! loopy false))}
-=======
-(defn threadedTimer "" [funcs]
-  (let
-    [wake (or (:wakeup funcs) (constantly nil))
-     loopy (volatile! true)
-     schedule
-     (or (:schedule funcs)
-         (fn [co c]
-           (async!
-            #(while @loopy
-               (wake co)
-               (pause (:intervalMillis c)))
-            {:cl (getCldr)})))]
-    {:start
-     (fn [co cfg]
-       (let [{:keys [intervalSecs
-                     delaySecs delayWhen]} cfg
-             func #(schedule %1 {:intervalMillis
-                                (s2ms intervalSecs)})]
-           (if (or (spos? delaySecs)
-                   (ist? Date delayWhen))
-             (configOnce (Timer.)
-                         [delayWhen (s2ms delaySecs)] func)
-             (func co))))
-       :stop
-       (fn [_] (vreset! loopy false))}))
->>>>>>> 60cbd957690818fbfff04e68c59ea4623eed7a54
+     :stop (fn [_] (vreset! loopy false))}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -168,57 +141,37 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- cancelTimer "" [^Timer t] (try! (some-> t .cancel)))
+(defn- cancelTimer "" [^TimerTask tt] (try! (some-> tt .cancel)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- xxxTimer<> "" [spec repeat?]
-
-<<<<<<< HEAD
-  (let
-    [pspec (update-in spec
-                      [:conf] expandVarsInForm)
-     vtbl
-     {:config (fn [me] (:conf @me))
-      :init (fn [me arg]
-              (let [c (get-in @me [:pspec :conf])]
-                (alterStateful
-                  me merge (prevarCfg (merge c arg)))))
-      :start (fn [me arg]
-               (let [t (Timer. true)
-                     cfg (.config me)
-                     w #(do (dispatch! (evt<> me repeat?))
-                            (if-not repeat? (cancelTimer t)))]
-                 (alterStateful me assoc :timer t)
-                 (configTimer t w cfg repeat?)))
-      :stop (fn [me] (cancelTimer (:timer @me)))}]
-    (pluglet<> pspec vtbl)))
-=======
-  (let [pspec (update-in spec
-                         [:conf] expandVarsInForm)
-        vtbl
-        {:stop #(try! (some-> ^Timer
-                              (:timer (.deref %1)) .cancel))}]
-    (object<> TimerMsg vbtl)))
->>>>>>> 60cbd957690818fbfff04e68c59ea4623eed7a54
+  {:pspec (update-in spec
+                     [:conf] expandVarsInForm)
+   :start
+   (fn [me arg]
+     (let [w #(dispatch! (evt<> me repeat?))
+           tt (configTimer (:timer @me)
+                           w
+                           (.config ^Config me) repeat?)]
+       (alterPluglet+ me :ttask tt)))
+   :stop
+   (fn [me] (cancelTimer (plugletVar me :timer)))})
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn RepeatingTimerSpec "" ^APersistentMap [] manyspecdef)
+(defn OnceTimerSpec "" ^APersistentMap [] onespecdef)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn RepeatingTimer "" ^czlab.wabbit.xpis.Pluglet
+(defn RepeatingTimer "" ^APersistentMap
   ([_ id] (RepeatingTimer _ id (RepeatingTimerSpec)))
   ([_ id spec] (xxxTimer<> spec true)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn OnceTimerSpec "" ^APersistentMap [] onespecdef)
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-(defn OnceTimer "" ^czlab.wabbit.xpis.Pluglet
+(defn OnceTimer "" ^APersistentMap
 
   ([_ id] (OnceTimer _ id (OnceTimerSpec)))
   ([_ id spec] (xxxTimer<> spec false)))

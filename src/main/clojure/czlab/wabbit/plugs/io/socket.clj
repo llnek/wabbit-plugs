@@ -89,36 +89,27 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn SocketIO
-  "" ^czlab.wabbit.xpis.Pluglet
+(defn SocketIO "" ^APersistentMap
   ([_ id] (SocketIO _ id (SocketIOSpec)))
   ([_ id spec]
-   (let
-     [pspec (update-in spec
-                       [:conf] expandVarsInForm)
-      vtbl
-      {:config  (fn [me] (:conf @me))
-       :init (fn [me arg]
-               (->> (merge (get-in @me [:pspec :conf]) arg)
-                    prevarCfg
-                    (alterStateful me assoc :conf )))
-       :start (fn [me _]
-                (when-some
-                  [ss (ssoc<> (:conf @me))]
-                  (alterStateful me assoc :ssoc ss)
-                  (async!
-                    #(while (not (.isClosed ss))
-                       (try
-                         (sockItDown me (.accept ss))
-                         (catch Throwable t
-                           (let [m (.getMessage t)]
-                             (if-not (and (hasNoCase? m "socket")
-                                          (hasNoCase? m "closed"))
-                               (log/warn t ""))))))
-                    {:cl (getCldr)})))
-       :stop (fn [me]
-               (closeQ (:ssoc @me)))}]
-     (pluglet<> pspec vtbl))))
+   {:pspec (update-in spec [:conf] expandVarsInForm)
+    :start
+    (fn [me _]
+      (when-some
+        [ss (ssoc<> (.config me))]
+        (alterPluglet me :ssoc ss)
+        (async!
+          #(while (not (.isClosed ss))
+             (try
+               (sockItDown me (.accept ss))
+               (catch Throwable t
+                 (let [m (.getMessage t)]
+                   (if-not (and (hasNoCase? m "socket")
+                                (hasNoCase? m "closed"))
+                     (log/warn t ""))))))
+          {:cl (getCldr)})))
+    :stop (fn [me]
+            (closeQ (plugletVar me :ssoc)))}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF
