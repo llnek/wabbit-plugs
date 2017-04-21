@@ -13,6 +13,7 @@
    ;;[com.github.spullara.mustache.java/compiler "0.9.4" ]
    ;;[com.google.code.findbugs/jsr305 "3.0.1"]
    [org.freemarker/freemarker "2.3.26-incubating"]
+   [commons-net/commons-net "3.6"]
    [org.apache.shiro/shiro-core "1.3.2"]
    [io.czlab/flux "1.0.0"]
    [io.czlab/nettio "1.0.0"]
