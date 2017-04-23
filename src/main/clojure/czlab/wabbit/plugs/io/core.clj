@@ -51,10 +51,10 @@
 (defn- error!
   "" [pglet job e]
   (if-some+
-    [r (strKW (:eror (plugSpec pglet)))]
+    [r (strKW (:eror (plug-spec pglet)))]
     (.callEx ^Cljrt
              (-> pglet
-                 getServer cljrt) r (vargs* Object job e))))
+                 get-server cljrt) r (vargs* Object job e))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -62,13 +62,13 @@
   ([evt] (dispatch! evt nil))
   ([evt arg]
    (log/debug "[%s] event is disp!" (-> evt
-                                        msgSource id??))
+                                        msg-source id??))
    (let
-     [^Config src (msgSource evt)
+     [^Config src (msg-source evt)
       cfg (.config src)
       c0 (:handler cfg)
       c1 (:handler arg)
-      ctr (getServer src)
+      ctr (get-server src)
       ^Cljrt rts (cljrt ctr)
       cb (or c1 c0)
       _ (assert (ifn? cb))
@@ -85,10 +85,10 @@
        (do->nil
          (cond
            (satisfies? Workstream wf)
-           (execWith wf job)
+           (exec-with wf job)
            (fn? wf)
            (-> (workstream<> (script<> #(wf %2) ))
-               (execWith job))
+               (exec-with job))
            :else
            (processOrphan job)))))))
 

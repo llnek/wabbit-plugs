@@ -39,13 +39,13 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;(set! *warn-on-reflection* false)
 
-(defobject FileMsg)
+(decl-object FileMsg)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- evt<>
   ""
-  [co {:keys [fname fp]}]
+  [co fname fp action]
 
   (object<> FileMsg
             {:file (io/file fp)
@@ -57,19 +57,15 @@
 ;;
 (defn- postPoll
   "Only look for new files"
-  [plug {:keys [recvFolder]} ^File f action]
+  [^Hierarchial plug {:keys [recvFolder]} ^File f action]
   (let
     [orig (.getName f)]
     (if-some
       [cf (if (and (not= action :FP-DELETED)
                    (some? recvFolder))
-            (try!
-              (doto->> (io/file recvFolder orig)
-                       (FileUtils/moveFile f))))]
-      (-> (evt<> (.parent ^Hierarchial plug)
-                 {:fname orig
-                  :fp cf :action action})
-          dispatch! ))))
+            (try! (doto->> (io/file recvFolder orig)
+                           (FileUtils/moveFile f))))]
+      (dispatch! (evt<> (.parent plug) orig cf action)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -160,21 +156,19 @@
    {:pspec (update-in spec
                       [:conf] expandVarsInForm)
     :schedule
-    (fn [me _]
-      (let [mon (fileMon<> me
-                           (.config ^Config me))]
+    (fn [^Config me _]
+      (let [mon (fileMon<> me (.config me))]
         (log/info "apache io monitor starting...")
-        (alterPluglet me :mon mon)
+        (setf! me :mon mon)
         (.start mon)))
+    :id id
     :init
-    (fn [me arg]
-      (-> (:info (rvtbl (:vtbl @me) :pspec))
-          (init2  arg)
-          (prevarCfg )))
+    (fn [me carg]
+      (-> (:vtbl @me) (rvtbl :pspec) :conf (init2 carg) prevarCfg ))
     :stop
     (fn [me]
       (let [^FileAlterationMonitor
-            m (alterPluglet- me :mon)]
+            m (unsetf! me :mon)]
         (log/info "apache io monitor stopping...")
         (.stop m)))}))
 

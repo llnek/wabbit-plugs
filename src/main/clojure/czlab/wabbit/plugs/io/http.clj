@@ -123,21 +123,21 @@
 (defn- resumeOnExpiry
   "" [^Channel ch evt]
   (try
-    (->> (httpResult ch evt HttpResponseStatus/INTERNAL_SERVER_ERROR)
-         (replyResult ch))
+    (->> (http-result ch evt HttpResponseStatus/INTERNAL_SERVER_ERROR)
+         (reply-result ch))
     (catch ClosedChannelException _
       (log/warn "channel closed already"))
     (catch Throwable t# (log/exception t#))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defobject WSockMsg WSockMsgGist)
+(decl-object WsockMsg WsockMsgGist)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- wsockEvent<> "" [co ch msg]
-  (object<> WSockMsg
-            (merge @msg
+  (mutable<> WsockMsg
+            (merge msg
                    {:id (str "WsockMsg." (seqint2))
                     :socket ch
                     :source co
@@ -145,77 +145,77 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defobject HttpEventObj
+(decl-mutable HttpEventObj
   HttpMsgGist
   Triggerable
-  (setTrigger [_ t]
-    (.setv (:impl data) :trigger t))
-  (cancel [_]
-    (some-> (.unsetv (:impl data) :trigger)
-            cancelTimerTask ))
+  (setTrigger [me t]
+    (setf! me  :trigger t))
+  (cancel [me]
+    (some-> (unsetf! me :trigger) cancelTimerTask))
   (fire [me _]
-    (when-some [t (.unsetv (:impl data) :trigger)]
-      (.setv (:impl data) :stale? true)
+    (when-some [t (unsetf! me :trigger)]
+      (setf! me :stale? true)
       (cancelTimerTask t)
       (resumeOnExpiry (:socket data) me))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- httpEvent<> "" [^Config co ch req]
+(defn- httpEvent<> "" [co ch req]
   (let
-    [{:keys [wantSession? session]} (.config co)
-     {:keys [route cookies]} @req]
+    [{:keys [wantSession? session]}
+     (.config ^Config co)
+     {:keys [route cookies]} req]
     (->>
       {:session (if (and (!false? wantSession?)
                          (some-> ^IDeref
                                  (:info route)
                                  .deref :wantSession?))
-                  (upstream (-> co getServer pkeyBytes)
+                  (upstream (-> co get-server pkey-bytes)
                             cookies
                             (:macit? @session)))
        :source co
-       :id (str "HttpMsg." (seqint2))
-       :impl (muble<> {:stale? false})}
-      (merge gist)
-      (object<> HttpEventObj))))
+       :stale? false
+       :id (str "HttpMsg." (seqint2))}
+      (merge req)
+      (mutable<> HttpEventObj))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- evt<>
   "" [co {:keys [ch msg]}]
   (cond
-    (satisfies? WSockMsgGist msg)
+    (satisfies? WsockMsgGist msg)
     (wsockEvent<> co ch msg)
     (satisfies? HttpMsgGist msg)
     (httpEvent<> co ch msg)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- boot! "" [co]
+(defn- boot! "" ^LifeCycle [co]
   (let
     [asset! (with-open [clj (Cljrt/newrt (getCldr))]
               (.varIt clj
                       "czlab.wabbit.plugs.io.mvc/asset!"))
      {:keys [waitMillis] :as cfg}
      (.config ^Config co)
-     bs
-     (createServer<>
-       :netty/http
-       (fn [_]
-         {:h1
-          (proxy [InboundHandler][]
-            (channelRead0 [ctx msg]
-              (let
-                [ev (evt<> co msg)
-                 {:keys [static? handler]}
-                 (some-> ^IDeref
-                         (:info (:route @ev)) .deref)
-                 hd (if (and static?
-                             (nil? handler)) asset! handler)]
-                (if (spos? waitMillis)
-                  (holdEvent co ev waitMillis))
-                (dispatch! ev {:handler hd}))))}) cfg)]
-    [bs (startServer bs cfg)]))
+     w (nettyWebServer<>)]
+    (->>
+      (fn [_]
+        {:h1
+         (proxy [InboundHandler][]
+           (channelRead0 [ctx msg]
+             (let [ev (evt<> co msg)
+                   {:keys [static? handler]}
+                   (some-> ^IDeref
+                           (:info (:route @ev)) .deref)
+                   hd (if (and static?
+                               (nil? handler)) asset! handler)]
+               (if (spos? waitMillis)
+                 (hold-event co ev waitMillis))
+               (dispatch! ev {:handler hd}))))})
+      (assoc cfg :ifunc)
+      (.init w))
+    w))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -225,16 +225,15 @@
   (let [s (or (:statusCode @job) 500)
         evt (rootage job)
         ch (socket evt)]
-    (->> (httpResult ch evt s)
-         (replyResult ch ))))
+    (->> (http-result ch evt s)
+         (reply-result ch ))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn Discarder! "" [func arg]
   (let
-    [ch (-> (discardHTTPD<> func arg)
-            (startServer arg))]
-    #(stopServer ch)))
+    [^LifeCycle
+     w (discardHTTPD<> func arg)] (.start w arg) #(.stop w)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -254,7 +253,7 @@
     (->>
       {:port (if-not (spos? port) (if ssl? 443 80) port)
        :routes (maybeLoadRoutes cfg)
-       :passwd (text (passwd<> passwd pkey))
+       :passwd (p-text (passwd<> passwd pkey))
        :serverKey (if ssl? (io/as-url serverKey))}
       (merge cfg ))))
 
@@ -316,11 +315,11 @@
   ([_ id spec]
    {:pspec (update-in spec
                       [:conf] expandVarsInForm)
+    :id id
     :init
     (fn [me arg]
-      (let [c (:info (rvtbl (:vtbl @me) :pspec))
-            ;;h (-> me getServer getHomeDir)
-            k (-> me getServer pkeyChars)
+      (let [c (:conf (rvtbl (:vtbl @me) :pspec))
+            k (-> me get-server pkey-chars)
             cfg (prevarCfg (basicfg k c arg))
             {:keys [publicRootDir pageDir]}
             (:wsite cfg)
@@ -328,20 +327,17 @@
                          (str pageDir))]
         (when (dirReadWrite? pub)
           (log/debug "freemarker tpl root: %s" (fpath pub))
-          (alterPluglet+ me
-                         :ftlCfg
-                         (mvc/genFtlConfig {:root pub})))
+          (setf! me :ftlCfg (mvc/genFtlConfig {:root pub})))
         cfg))
     :start
     (fn [me _]
-      (let [[bs ch] (boot! me)]
-        (alterPluglet+ me :boot bs)
-        (alterPluglet+ me :chan ch)))
+      (let [w (boot! me)]
+        (setf! me :boot w)
+        (.start w (.config ^Config me))))
     :stop
     (fn [me]
-      (let [{:keys [chan boot]}
-            (.intern (:impl @me))]
-        (some-> chan stopServer)))}))
+      (let [{:keys [boot]} @me]
+        (some-> boot .stop)))}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF
