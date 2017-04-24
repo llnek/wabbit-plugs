@@ -20,6 +20,7 @@
         [czlab.wabbit.plugs.io.core])
 
   (:import [java.util Hashtable Properties ResourceBundle]
+           [czlab.jasal Hierarchial Config]
            [javax.jms
             ConnectionFactory
             Connection
@@ -45,6 +46,8 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;(set! *warn-on-reflection* true)
+
+(decl-object JmsMsg)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -74,8 +77,8 @@
              ^String jmsUser]}
      (.config co)
      pg (.parent ^Hierarchial co)
-     pwd (->> (getServer pg)
-              (pkeyChars)
+     pwd (->> (get-server pg)
+              (pkey-chars)
               (passwd<> jmsPwd))
      c (.lookup ctx destination)
      ^Connection
@@ -108,8 +111,8 @@
              ^String jmsPwd]}
      (.config co)
      pg (.parent ^Hierarchial co)
-     pwd (->> (getServer pg)
-              (pkeyChars)
+     pwd (->> (get-server pg)
+              (pkey-chars)
               (passwd<> jmsPwd))
      conn (if (hgl? jmsUser)
             (.createTopicConnection
@@ -142,8 +145,8 @@
              ^String jmsPwd]}
      (.config co)
      pg (.parent ^Hierarchial co)
-     pwd (->> (getServer pg)
-              (pkeyChars)
+     pwd (->> (get-server pg)
+              (pkey-chars)
               (passwd<> jmsPwd))
      conn (if (hgl? jmsUser)
             (.createQueueConnection
@@ -168,8 +171,8 @@
   ""
   [pkey {:keys [jndiPwd jmsPwd] :as cfg}]
 
-  (-> (assoc cfg :jndiPwd (text (passwd<> jndiPwd pkey)))
-      (assoc :jmsPwd (text (passwd<> jmsPwd pkey)))))
+  (-> (assoc cfg :jndiPwd (p-text (passwd<> jndiPwd pkey)))
+      (assoc :jmsPwd (p-text (passwd<> jmsPwd pkey)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -177,9 +180,9 @@
 
   ""
   ^Connection
-  [^Pluggable co {:keys [contextFactory
-                         providerUrl
-                         jndiUser jndiPwd connFactory]}]
+  [co {:keys [contextFactory
+              providerUrl
+              jndiUser jndiPwd connFactory]}]
 
   (let
     [vars (Hashtable.)]
@@ -238,18 +241,19 @@
   ([_ id] (JMS _ id (JMSSpec)))
   ([_ id spec]
    {:pspec (update-in spec [:conf] expandVarsInForm)
+    :id id
     :init (fn [me arg]
             (let [pg (.parent ^Hierarchial me)
                   c (-> (:vtbl @me)
                         (rvtbl :pspec) :conf)
-                  k (-> pg getServer pkeyChars)]
+                  k (-> pg get-server pkey-chars)]
               (prevarCfg (merge c (sanitize k arg)))))
     :start (fn [me _]
-             (-> (.config me)
-                 (start2 me)
-                 (alterPluglet+ me :$conn)))
+             (->> (.config ^Config me)
+                  (start2 me)
+                  (setf! me :$conn)))
     :stop (fn [me]
-            (when-some [c (plugletVar me :$conn)]
+            (when-some [c (:$conn @me)]
               (try! (closeQ c))))}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

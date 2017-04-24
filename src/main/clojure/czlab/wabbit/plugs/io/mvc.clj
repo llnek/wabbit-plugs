@@ -39,9 +39,6 @@
             TemplateMethodModel
             Configuration
             DefaultObjectWrapper]
-           [czlab.wabbit.ctl Pluglet PlugMsg]
-           [czlab.wabbit.plugs.io HttpMsg]
-           [czlab.flux.wflow Workstream Job]
            [java.net HttpCookie]
            [czlab.convoy.net
             WebContent
@@ -170,7 +167,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn loadTemplate
-  "" ^APersistentMap [^Pluglet co tpath data]
+  "" ^APersistentMap [^Config co tpath data]
 
   (let
     [ts (str "/" (triml tpath "/"))
@@ -214,68 +211,66 @@
   ""
   [^HttpMsg evt file]
   (let
-    [cfg (.. evt source config)
-     ^Channel ch (.socket evt)
-     gist (.gist evt)
-     res (httpResult<> evt)
+    [^Config co (:source evt)
+     cfg (.config co)
+     ^Channel ch (:socket evt)
+     res (http-result evt)
      fp (io/file file)]
     (log/debug "serving file: %s" (fpath fp))
     (try
       (if (or (nil? fp)
               (not (.exists fp)))
         (do
-          (.setStatus res 404)
-          (replyResult res))
+          (set-res-status res 404)
+          (reply-result res))
         (do
-          (.setContent res fp)
-          (replyResult res)))
+          (set-res-content res fp)
+          (reply-result res)))
       (catch Throwable e#
-        (log/error e# "get: %s" (:uri gist))
+        (log/error e# "get: %s" (:uri evt))
         (try!
-          (.setStatus res 500)
-          (.setContent res nil)
-          (replyResult res))))))
+          (set-res-status res 500)
+          (set-res-content res nil)
+          (reply-result res))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (def ^:private asset-handler
   (workstream<>
-    (script<>
-      #(let
-         [^HttpMsg evt (.origin ^Job %2)
-          gist (.gist evt)
-          {{:keys [publicRootDir]} :wsite :as cfg}
-          (.. evt source config)
-          homeDir (fpath (.. evt
-                             source server homeDir))
-          r (.routeGist evt)
-          mp (str (some-> ^RouteInfo
-                          (:info r) .mountPoint))
-          ;;need to do this for testing only since expandvars
-          ;;not called
-          publicRootDir (expandVars publicRootDir)
-          pubDir (io/file publicRootDir)
-          fp (-> (reduce
-                   (fn [a b] (cs/replace-first a "{}" b))
-                   mp (:groups r))
-                 maybeStripUrlCrap
-                 strim)
-          ffile (io/file pubDir fp)
-          check? (:fileAccessCheck? cfg)]
-         (log/info "request for asset: dir=%s, fp=%s" publicRootDir fp)
-         (if (and (hgl? fp)
-                  (or (false? check?)
-                      (.startsWith (fpath ffile)
-                                   (fpath pubDir))))
-           (getStatic evt ffile)
-           (let [ch (.socket evt)]
-             (log/warn "illegal uri access: %s" fp)
-             (-> (httpResult<> evt 403)
-                 (replyResult ))))))))
+    #(let
+       [^HttpMsg evt (rootage %1)
+        ^Config co (:source evt)
+        {{:keys [publicRootDir]} :wsite :as cfg}
+        (.config co)
+        homeDir (fpath (-> co get-server get-home-dir))
+        r (:route evt)
+        mp (str (some-> ^RouteInfo
+                        (:info r) :mountPoint))
+        ;;need to do this for testing only since expandvars
+        ;;not called
+        publicRootDir (expandVars publicRootDir)
+        pubDir (io/file publicRootDir)
+        fp (-> (reduce
+                 (fn [a b] (cs/replace-first a "{}" b))
+                 mp (:groups r))
+               maybeStripUrlCrap
+               strim)
+        ffile (io/file pubDir fp)
+        check? (:fileAccessCheck? cfg)]
+       (log/info "request for asset: dir=%s, fp=%s" publicRootDir fp)
+       (if (and (hgl? fp)
+                (or (false? check?)
+                    (.startsWith (fpath ffile)
+                                 (fpath pubDir))))
+         (getStatic evt ffile)
+         (let [ch (:socket evt)]
+           (log/warn "illegal uri access: %s" fp)
+           (-> (http-result evt 403)
+               (reply-result )))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn asset! "" ^Workstream [] asset-handler)
+(defn asset! "" [] asset-handler)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF

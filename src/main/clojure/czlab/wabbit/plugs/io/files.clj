@@ -24,6 +24,7 @@
   (:import [java.io FileFilter File IOException]
            [java.util Properties ResourceBundle]
            [clojure.lang APersistentMap]
+           [czlab.jasal Config]
            [org.apache.commons.io.filefilter
             SuffixFileFilter
             PrefixFileFilter
@@ -57,7 +58,7 @@
 ;;
 (defn- postPoll
   "Only look for new files"
-  [^Hierarchial plug {:keys [recvFolder]} ^File f action]
+  [plug {:keys [recvFolder]} ^File f action]
   (let
     [orig (.getName f)]
     (if-some
@@ -65,7 +66,7 @@
                    (some? recvFolder))
             (try! (doto->> (io/file recvFolder orig)
                            (FileUtils/moveFile f))))]
-      (dispatch! (evt<> (.parent plug) orig cf action)))))
+      (dispatch! (evt<> plug orig cf action)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -109,21 +110,23 @@
 (defn- fileMon<>
   ""
   ^FileAlterationMonitor
-  [plug {:keys [targetFolder
-                intervalSecs
-                ^FileFilter fmask] :as cfg}]
+  [^Config plug]
   (let
-    [obs (FileAlterationObserver. (io/file targetFolder) fmask)
-     mon (-> (s2ms intervalSecs)
-             FileAlterationMonitor.)]
+    [{:keys [targetFolder
+             intervalSecs
+             ^FileFilter fmask] :as cfg}
+     (.config me)
+     obs (-> (io/file targetFolder)
+             (FileAlterationObserver. fmask))
+     mon (-> (s2ms intervalSecs) FileAlterationMonitor.)]
     (->>
       (proxy [FileAlterationListenerAdaptor][]
         (onFileCreate [f]
-          (postPoll co cfg f :FP-CREATED))
+          (postPoll plug cfg f :FP-CREATED))
         (onFileChange [f]
-          (postPoll co cfg f :FP-CHANGED))
+          (postPoll plug cfg f :FP-CHANGED))
         (onFileDelete [f]
-          (postPoll co cfg f :FP-DELETED)))
+          (postPoll plug cfg f :FP-DELETED)))
       (.addListener obs ))
     (.addObserver mon obs)
     mon))
@@ -155,22 +158,21 @@
   ([_ id spec]
    {:pspec (update-in spec
                       [:conf] expandVarsInForm)
+    :id id
     :schedule
-    (fn [^Config me _]
-      (let [mon (fileMon<> me (.config me))]
-        (log/info "apache io monitor starting...")
-        (setf! me :mon mon)
-        (.start mon)))
+    (fn [me _]
+      (log/info "apache io monitor starting...")
+      (doto->> (fileMon<> me)
+               (setf! me :mon ) .start))
     :id id
     :init
     (fn [me carg]
       (-> (:vtbl @me) (rvtbl :pspec) :conf (init2 carg) prevarCfg ))
     :stop
     (fn [me]
-      (let [^FileAlterationMonitor
-            m (unsetf! me :mon)]
-        (log/info "apache io monitor stopping...")
-        (.stop m)))}))
+      (log/info "apache io monitor stopping...")
+      (some-> ^FileAlterationMonitor
+              (unsetf! me :mon) .stop))}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF

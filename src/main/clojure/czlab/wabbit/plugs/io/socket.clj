@@ -22,19 +22,18 @@
         [czlab.wabbit.base])
 
   (:import [java.net InetAddress ServerSocket Socket]
-           [czlab.wabbit.ctl Pluglet Pluggable]
-           [clojure.lang APersistentMap]
-           [czlab.wabbit.plugs.io TcpMsg]))
+           [czlab.jasal Config]
+           [clojure.lang APersistentMap]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;(set! *warn-on-reflection* true)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defobject TcpMsg
+(decl-object TcpMsg
   Disposable
   (dispose [me]
-           (closeQ (:socket @me))))
+           (closeQ (:socket me))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -93,11 +92,12 @@
   ([_ id] (SocketIO _ id (SocketIOSpec)))
   ([_ id spec]
    {:pspec (update-in spec [:conf] expandVarsInForm)
+    :id id
     :start
     (fn [me _]
       (when-some
-        [ss (ssoc<> (.config me))]
-        (alterPluglet me :ssoc ss)
+        [ss (ssoc<> (.config ^Config me))]
+        (setf! me :ssoc ss)
         (async!
           #(while (not (.isClosed ss))
              (try
@@ -109,7 +109,7 @@
                      (log/warn t ""))))))
           {:cl (getCldr)})))
     :stop (fn [me]
-            (closeQ (plugletVar me :ssoc)))}))
+            (closeQ (:ssoc @me)))}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF

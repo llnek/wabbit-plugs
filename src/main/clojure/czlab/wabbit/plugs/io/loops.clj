@@ -105,7 +105,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defobject TimerMsg)
+(decl-object TimerMsg)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -145,18 +145,19 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- xxxTimer<> "" [spec repeat?]
+(defn- xxxTimer<> "" [id spec repeat?]
   {:pspec (update-in spec
                      [:conf] expandVarsInForm)
+   :id id
    :start
    (fn [me arg]
-     (let [w #(dispatch! (evt<> me repeat?))
-           tt (configTimer (:timer @me)
-                           w
-                           (.config ^Config me) repeat?)]
-       (alterPluglet+ me :ttask tt)))
+     (->>
+       (configTimer (:timer @me)
+                    #(dispatch! (evt<> me repeat?))
+                    (.config ^Config me) repeat?)
+       (setf! me :ttask)))
    :stop
-   (fn [me] (cancelTimer (plugletVar me :timer)))})
+   (fn [me] (cancelTimer (:timer @me)))})
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -167,14 +168,14 @@
 ;;
 (defn RepeatingTimer "" ^APersistentMap
   ([_ id] (RepeatingTimer _ id (RepeatingTimerSpec)))
-  ([_ id spec] (xxxTimer<> spec true)))
+  ([_ id spec] (xxxTimer<> id spec true)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn OnceTimer "" ^APersistentMap
 
   ([_ id] (OnceTimer _ id (OnceTimerSpec)))
-  ([_ id spec] (xxxTimer<> spec false)))
+  ([_ id spec] (xxxTimer<> id spec false)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF

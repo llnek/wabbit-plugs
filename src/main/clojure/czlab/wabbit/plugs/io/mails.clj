@@ -71,7 +71,8 @@
   (let [{:keys [store folder]} @co]
     (closeFolder folder)
     (try! (some-> ^Store store .close))
-    (alterStateful co dissoc :store :folder)))
+    (unsetf! co dissoc :store)
+    (unsetf! co dissoc :folder)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -100,14 +101,11 @@
       (throwIOE (str "Failed to find store: " pz)))
     (log/info "mail store impl = %s" sun)
     (.setProvider ss sun)
-    (alterStateful co
-                   assoc
-                   :proto proto
-                   :session ss)))
+    (copy* co {:proto proto :session ss})))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defobject MailMsg)
+(decl-object MailMsg)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -133,16 +131,14 @@
                 ^long port
                 user
                 (stror (strit passwd) nil))
-      (alterStateful
-        me
-        assoc
-        :store s
-        :folder (some-> (.getDefaultFolder s)
-                        (.getFolder "INBOX")))
-      (let [fd (:folder @me)]
+      (copy* co
+             {:store s
+              :folder (some-> (.getDefaultFolder s)
+                              (.getFolder "INBOX"))})
+      (let [fd (:folder @co)]
         (when (or (nil? fd)
                   (not (.exists ^Folder fd)))
-          (alterStateful me dissoc :store)
+          (unsetf! co :store)
           (try! (.close s))
           (throwIOE "cannot find inbox"))))))
 
@@ -162,8 +158,7 @@
 ;;
 (defn- scanPop3 "" [co]
 
-  (let [{:keys [^Folder folder
-                ^Store store]} @co]
+  (let [{:keys [^Folder folder ^Store store]} co]
     (if (and folder
              (not (.isOpen folder)))
       (.open folder Folder/READ_WRITE))
@@ -201,7 +196,7 @@
       (assoc :host (str host))
       (assoc :port (if (spos? port) port 995))
       (assoc :user (str user ))
-      (assoc :passwd (text (passwd<> passwd pkey)))))
+      (assoc :passwd (p-text (passwd<> passwd pkey)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -234,8 +229,8 @@
    :id id
    :init
    (fn [me arg]
-     (let [c (:info (rvtbl (:vtbl @me) :pspec))
-           k (-> me getServer pkeyChars)
+     (let [c (:conf (rvtbl (:vtbl @me) :pspec))
+           k (-> me get-server pkey-chars)
            c2 (prevarCfg (merge c
                                 (sanitize k arg)))]
        (->> (if (:ssl? c2) sslvars vars)
