@@ -31,19 +31,19 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defobject TcpMsg
+(decl-object TcpMsg
   Disposable
   (dispose [me]
-           (closeQ (:socket @me))))
+           (closeQ (:socket me))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- evt<>
   "" [co ^Socket socket]
   (object<> TcpMsg
-            {:id (str "TcpMsg." (seqint2))
-             :sockOut (.getOutputStream socket)
-             :sockIn (.getInputStream socket)
+            {:sockout (.getOutputStream socket)
+             :sockin (.getInputStream socket)
+             :id (str "TcpMsg." (seqint2))
              :source co
              :socket socket}))
 
@@ -89,27 +89,49 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn SocketIO "" ^APersistentMap
+(decl-mutable SocketPluglet
+  Pluglet
+  (is-enabled? [me] (bool! (:isEnabled? @me)))
+  (plug-spec [me] (:pspec @me))
+  (hold-event [_ t millis] )
+  (get-server [me] (:parent @me))
+  (pspec [me] (:pspec @me)
+  Idable
+  (id [me] (:emAlias @me))
+  Config
+  (config [me] (:conf @me))
+  LifeCycle
+  (start [me] (.start me nil))
+  (start [me _]
+    (when-some
+      [ss (ssoc<> (.config me))]
+      (setf! me :ssoc ss)
+      (async!
+        #(while (not (.isClosed ss))
+           (try
+             (sockItDown me (.accept ss))
+             (catch Throwable t
+               (let [m (.getMessage t)]
+                 (if-not (and (hasNoCase? m "socket")
+                              (hasNoCase? m "closed"))
+                   (log/warn t ""))))))
+        {:cl (getCldr)})))
+  (init [me arg]
+    (let [c (get-in @me [:pspec :conf])]
+      (doto->> (prevarCfg (merge c arg))
+               (setf! me :conf))))
+  (dispose [_])
+  (stop [me]
+    (closeQ (:ssoc @me)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+(defn SocketIO ""
   ([_ id] (SocketIO _ id (SocketIOSpec)))
   ([_ id spec]
-   {:pspec (update-in spec [:conf] expandVarsInForm)
-    :start
-    (fn [me _]
-      (when-some
-        [ss (ssoc<> (.config me))]
-        (alterPluglet me :ssoc ss)
-        (async!
-          #(while (not (.isClosed ss))
-             (try
-               (sockItDown me (.accept ss))
-               (catch Throwable t
-                 (let [m (.getMessage t)]
-                   (if-not (and (hasNoCase? m "socket")
-                                (hasNoCase? m "closed"))
-                     (log/warn t ""))))))
-          {:cl (getCldr)})))
-    :stop (fn [me]
-            (closeQ (plugletVar me :ssoc)))}))
+   (mutable<> SocketPluglet
+              {:pspec (update-in spec
+                                 [:conf] expandVarsInForm) :emAlias id})))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF
