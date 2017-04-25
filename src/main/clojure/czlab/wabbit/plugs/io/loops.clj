@@ -22,6 +22,7 @@
         [czlab.wabbit.plugs.io.core])
 
   (:import [java.util Date Timer TimerTask]
+           [czlab.jasal LifeCycle Idable]
            [clojure.lang APersistentMap]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -66,7 +67,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- configTimer
+(defn configTimer
   ""
   ^TimerTask
   [timer wakeup {:keys [intervalSecs
@@ -82,26 +83,45 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn threadedTimer "" ^APersistentMap []
-  (let [loopy (volatile! true)]
-    {:start
-     (fn [me cfg]
-       (let [{:keys [intervalSecs delaySecs delayWhen]} cfg
-             f #(rvtbl (:vtbl @me) :schedule me (s2ms intervalSecs))]
-         (if (or (spos? delaySecs)
-                 (ist? Date delayWhen))
-           (configOnce (Timer.)
-                       [delayWhen (s2ms delaySecs)] f)
-           (f))))
-     :schedule
-     (fn [me millis]
-       (async!
-         #(while @loopy
-            (rvtbl (:vtbl @me) :wake me)
-            (pause millis))
-         {:cl (getCldr)}))
-     :wake (constantly nil)
-     :stop (fn [_] (vreset! loopy false))}))
+(defn scheduleThreadedLoop "" [plug waker]
+  (let [{:keys [intervalSecs] :as cfg}
+        (:conf @plug)
+        loopy (volatile! true)
+        ms (s2ms intervalSecs)
+        w #(async!
+             (fn [_]
+               (while @loopy
+                 (waker me) (pause ms))))]
+    (configTimer (:timer @plug) w cfg false)
+    loopy))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+(defn stopThreadedLoop "" [loopy] (vreset! loopy false))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+(decl-mutable TimerPluglet
+  Pluglet
+  (hold-event [_ t millis] (scheduleTrigger _ t millis))
+  (get-server [me] (:parent @me))
+  Idable
+  (id [me] (:emAlias @me))
+  LifeCycle
+  (init [me arg]
+    (let [c (get-in @me [:pspec :conf])]
+      (doto->> (prevarCfg (merge c arg))
+               (setf! me :conf))))
+  (start [me] (.start me nil))
+  (start [me arg]
+    (let [r? (:repeatable? @me)]
+      (->> (configTimer (:timer @me)
+                        #(dispatch! (evt<> me r?))
+                        (:conf @me) r?)
+           (setf! me :ttask))))
+  (stop [me]
+    (cancelTimer (:timer @me)))
+  (dispose [_]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -145,19 +165,14 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- xxxTimer<> "" [id spec repeat?]
-  {:pspec (update-in spec
-                     [:conf] expandVarsInForm)
-   :id id
-   :start
-   (fn [me arg]
-     (->>
-       (configTimer (:timer @me)
-                    #(dispatch! (evt<> me repeat?))
-                    (.config ^Config me) repeat?)
-       (setf! me :ttask)))
-   :stop
-   (fn [me] (cancelTimer (:timer @me)))})
+(defn- xxxTimer<> "" [_ id spec repeat?]
+  (mutable<> TimerPluglet
+             {:pspec (update-in spec
+                                [:conf] expandVarsInForm)
+              :timer (Timer. true)
+              :parent _
+              :emAlias id
+              :repeatable? repeat?}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -166,16 +181,15 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn RepeatingTimer "" ^APersistentMap
+(defn RepeatingTimer ""
   ([_ id] (RepeatingTimer _ id (RepeatingTimerSpec)))
-  ([_ id spec] (xxxTimer<> id spec true)))
+  ([_ id spec] (xxxTimer<> _ id spec true)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn OnceTimer "" ^APersistentMap
-
+(defn OnceTimer ""
   ([_ id] (OnceTimer _ id (OnceTimerSpec)))
-  ([_ id spec] (xxxTimer<> id spec false)))
+  ([_ id spec] (xxxTimer<> _ id spec false)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF

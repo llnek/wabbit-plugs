@@ -20,7 +20,7 @@
         [czlab.wabbit.plugs.io.core])
 
   (:import [java.util Hashtable Properties ResourceBundle]
-           [czlab.jasal Hierarchial Config]
+           [czlab.jasal LifeCycle Idable]
            [javax.jms
             ConnectionFactory
             Connection
@@ -69,24 +69,24 @@
 ;;
 (defn- inizFac
   "" ^Connection
-  [^Config co ^InitialContext ctx ^ConnectionFactory cf]
+  [co ^InitialContext ctx ^ConnectionFactory cf]
 
   (let
     [{:keys [^String destination
              ^String jmsPwd
              ^String jmsUser]}
-     (.config co)
-     pg (.parent ^Hierarchial co)
-     pwd (->> (get-server pg)
+     (:conf @co)
+     pwd (->> (get-server co)
               (pkey-chars)
-              (passwd<> jmsPwd))
+              (passwd<> jmsPwd)
+              (p-text))
      c (.lookup ctx destination)
      ^Connection
      conn (if (hgl? jmsUser)
             (.createConnection
               cf
               jmsUser
-              (stror (str pwd) nil))
+              (stror (strit pwd) nil))
             (.createConnection cf))]
     (if (ist? Destination c)
       ;;TODO ? ack always ?
@@ -102,23 +102,23 @@
 ;;
 (defn- inizTopic
   "" ^Connection
-  [^Config co ^InitialContext ctx ^TopicConnectionFactory cf]
+  [co ^InitialContext ctx ^TopicConnectionFactory cf]
 
   (let
     [{:keys [^String destination
              ^String jmsUser
              durable?
              ^String jmsPwd]}
-     (.config co)
-     pg (.parent ^Hierarchial co)
-     pwd (->> (get-server pg)
+     (:conf @co)
+     pwd (->> (get-server me)
               (pkey-chars)
-              (passwd<> jmsPwd))
+              (passwd<> jmsPwd)
+              (p-text))
      conn (if (hgl? jmsUser)
             (.createTopicConnection
               cf
               jmsUser
-              (stror (str pwd) nil))
+              (stror (strit pwd) nil))
             (.createTopicConnection cf))
      s (.createTopicSession
          conn false Session/CLIENT_ACKNOWLEDGE)
@@ -137,22 +137,22 @@
 ;;
 (defn- inizQueue
   "" ^Connection
-  [^Config co ^InitialContext ctx ^QueueConnectionFactory cf]
+  [co ^InitialContext ctx ^QueueConnectionFactory cf]
 
   (let
     [{:keys [^String destination
              ^String jmsUser
              ^String jmsPwd]}
-     (.config co)
-     pg (.parent ^Hierarchial co)
-     pwd (->> (get-server pg)
+     (:conf @co)
+     pwd (->> (get-server me)
               (pkey-chars)
-              (passwd<> jmsPwd))
+              (passwd<> jmsPwd)
+              (p-text))
      conn (if (hgl? jmsUser)
             (.createQueueConnection
               cf
               jmsUser
-              (stror (str pwd) nil))
+              (stror (strit pwd) nil))
             (.createQueueConnection cf))
      s (.createQueueSession conn
                             false Session/CLIENT_ACKNOWLEDGE)
@@ -213,6 +213,29 @@
       (.start c)
       c)))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+(decl-mutable JMSPluglet
+  Pluglet
+  (hold-event [_ t millis] (scheduleTrigger _ t millis))
+  (get-server [me] (:parent @me))
+  Idable
+  (id [me] (:emAlias @me))
+  LifeCycle
+  (init [me arg]
+    (let [k (-> me get-server pkey-chars)
+          c (get-in @me [:pspec :conf])]
+      (->> (prevarCfg (sanitize k
+                                (merge c arg)))
+           (setf! me :conf))))
+  (start [me] (.start me nil))
+  (start [me arg]
+    (->> (:conf @me) (start2 me) (setf! me :$conn)))
+  (stop [me]
+    (when-some [c (:$conn @me)]
+      (try! (closeQ c))))
+  (dispose [_]))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (def
@@ -237,24 +260,14 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn JMS "" ^APersistentMap
+(defn JMS ""
   ([_ id] (JMS _ id (JMSSpec)))
   ([_ id spec]
-   {:pspec (update-in spec [:conf] expandVarsInForm)
-    :id id
-    :init (fn [me arg]
-            (let [pg (.parent ^Hierarchial me)
-                  c (-> (:vtbl @me)
-                        (rvtbl :pspec) :conf)
-                  k (-> pg get-server pkey-chars)]
-              (prevarCfg (merge c (sanitize k arg)))))
-    :start (fn [me _]
-             (->> (.config ^Config me)
-                  (start2 me)
-                  (setf! me :$conn)))
-    :stop (fn [me]
-            (when-some [c (:$conn @me)]
-              (try! (closeQ c))))}))
+   (mutable<> JMSPluglet
+              {:pspec (update-in spec [:conf] expandVarsInForm)
+               :emAlias id
+               :parent _
+               :timer (Timer. true)})))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF

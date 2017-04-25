@@ -30,21 +30,20 @@
             MBeanParameterInfo
             ReflectionException
             AttributeNotFoundException]
-           [java.util Arrays]
-           [czlab.jasal Muble]))
+           [java.util Arrays]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;(set! *warn-on-reflection* true)
 
-(defobject NameParams
+(decl-mutable NameParams
   Object
-  (toString [_]
-    (let [{:keys [name params]} @data]
+  (toString [me]
+    (let [{:keys [name params]} @me]
       (if (empty? params)
         name
         (str name "/" (cs/join "#" params)))))
-  (hashCode [_]
-    (let [{:keys [name params]} @data]
+  (hashCode [me]
+    (let [{:keys [name params]} @me]
       (int (reduce
              #(+ %1 (.hashCode %2))
              (* 31 (+ 31 (.hashCode name)))
@@ -52,17 +51,16 @@
   (equals [me obj]
     (and obj
          (= (.getClass me) (.getClass obj))
-         (= (:name @data) (:name @obj))
-         (= (:params @data) (:params @obj)))))
+         (= (:name @me) (:name @obj))
+         (= (:params @me) (:params @obj)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn nameParams<> ""
   ([name] (nameParams<> name nil))
   ([name pms]
-   (object<> NameParams
-             {:name name
-              :params (or pms [])})))
+   (mutable<> NameParams
+              {:name name :params (or pms [])})))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -97,31 +95,37 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
+(decl-mutable BPropInfoObj
+  BPropInfo
+  (get-type [me]
+    (if-some [g (get-getter me)]
+      (.getReturnType g)
+      (let [ps (some-> (get-setter me)
+                       .getParameterTypes)]
+        (if (== 1 (count ps)) (first ps)))))
+  (set-setter [me m] (setf! me :setr m))
+  (set-getter [me m] (setf! me :getr m))
+  (get-setter [me] (:setr @me))
+  (get-getter [me] (:getr @me))
+  (get-desc [me] (:descn @me))
+  (get-name [me] (:prop @me))
+  (is-query? [me]
+    (if-some [g (get-getter me)]
+      (and (-> (.getName g)
+               (.startsWith "is"))
+           (isBoolean? (.getReturnType g)))
+      false)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
 (defn- mkBPropInfo "" [^String prop ^String descn
                        ^Method getr ^Method setr]
-  (let
-    [impl (muble<> {:getr getr
-                    :setr setr
-                    :type nil})]
-    (reify BPropInfo
-      (get-type [this]
-        (if-some [g (get-getter this)]
-          (.getReturnType g)
-          (let [ps (some-> (get-setter this)
-                           .getParameterTypes)]
-            (if (== 1 (count ps)) (first ps)))))
-      (set-setter [_ m] (.setv impl :setr m))
-      (set-getter [_ m] (.setv impl :getr m))
-      (get-setter [_] (.getv impl :setr))
-      (get-getter [_] (.getv impl :getr))
-      (get-desc [_] descn)
-      (get-name [_] prop)
-      (is-query? [this]
-        (if-some [g (get-getter this)]
-          (and (-> (.getName g)
-                   (.startsWith "is"))
-               (isBoolean? (.getReturnType g)))
-          false)))))
+  (mutable<> BPropInfoObj
+             {:descn descn
+              :prop prop
+              :getr getr
+              :setr setr
+              :type nil}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

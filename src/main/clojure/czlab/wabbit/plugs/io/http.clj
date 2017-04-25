@@ -35,14 +35,12 @@
         [czlab.basal.str]
         [czlab.basal.meta])
 
-  (:import [czlab.convoy HttpResult RouteCracker RouteInfo]
-           [czlab.nettio WholeRequest InboundHandler]
-           [java.nio.channels ClosedChannelException]
+  (:import [java.nio.channels ClosedChannelException]
+           [io.netty.handler.codec DecoderException]
            [io.netty.handler.codec.http.websocketx
             TextWebSocketFrame
             WebSocketFrame
             BinaryWebSocketFrame]
-           [io.netty.handler.codec DecoderException]
            [io.netty.handler.codec.http.cookie
             ServerCookieDecoder
             ServerCookieEncoder]
@@ -50,6 +48,8 @@
            [io.netty.buffer ByteBuf Unpooled]
            [io.netty.handler.ssl SslHandler]
            [clojure.lang Atom APersistentMap]
+           [czlab.nettio InboundHandler]
+           [czlab.jasal LifeCycle Idable]
            [czlab.basal Cljrt]
            [java.util Timer TimerTask]
            [io.netty.handler.codec.http
@@ -115,11 +115,6 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- maybeClose
-  "" [evt cf] (closeCF cf (:isKeepAlive? @evt)))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
 (defn- resumeOnExpiry
   "" [^Channel ch evt]
   (try
@@ -129,24 +124,18 @@
       (log/warn "channel closed already"))
     (catch Throwable t# (log/exception t#))))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-(decl-object WsockMsg WsockMsgGist)
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- wsockEvent<> "" [co ch msg]
-  (mutable<> WsockMsg
-            (merge msg
-                   {:id (str "WsockMsg." (seqint2))
-                    :socket ch
-                    :source co
-                    :ssl? (maybeSSL? ch) })))
+  (merge msg
+         {:id (str "WsockMsg." (seqint2))
+          :socket ch
+          :source co
+          :ssl? (maybeSSL? ch) }))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(decl-mutable HttpEventObj
-  HttpMsgGist
+(decl-mutable XXXHttpEventObj
   Triggerable
   (setTrigger [me t]
     (setf! me  :trigger t))
@@ -156,14 +145,14 @@
     (when-some [t (unsetf! me :trigger)]
       (setf! me :stale? true)
       (cancelTimerTask t)
-      (resumeOnExpiry (:socket data) me))))
+      (resumeOnExpiry (:socket me) me))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- httpEvent<> "" [co ch req]
   (let
     [{:keys [wantSession? session]}
-     (.config ^Config co)
+     (:conf @co)
      {:keys [route cookies]} req]
     (->>
       {:session (if (and (!false? wantSession?)
@@ -176,8 +165,7 @@
        :source co
        :stale? false
        :id (str "HttpMsg." (seqint2))}
-      (merge req)
-      (mutable<> HttpEventObj))))
+      (merge req))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -197,7 +185,7 @@
               (.varIt clj
                       "czlab.wabbit.plugs.io.mvc/asset!"))
      {:keys [waitMillis] :as cfg}
-     (.config ^Config co)
+     (:conf @co)
      w (nettyWebServer<>)]
     (->>
       (fn [_]
@@ -259,6 +247,34 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
+(decl-mutable HttpPluglet
+  Idable
+  (id [me] (:emAlias @me))
+  LifeCycle
+  (init [me arg]
+    (let [k (-> me get-server pkey-chars)
+          c (get-in @me [:pspec :conf])
+          cfg (prevarCfg (basicfg k c arg))
+          {:keys [publicRootDir pageDir]}
+          (:wsite cfg)
+          pub (io/file (str publicRootDir)
+                       (str pageDir))]
+      (when (dirReadWrite? pub)
+        (log/debug "freemarker tpl root: %s" (fpath pub))
+        (setf! me :ftlCfg (mvc/genFtlConfig {:root pub})))
+      cfg))
+  (start [me] (.start me nil))
+  (start [me arg]
+    (let [w (boot! me)]
+      (setf! me :boot w)
+      (.start w (:conf @me))))
+  (dispose [_])
+  (stop [me]
+    (let [{:keys [boot]} @me]
+      (some-> boot .stop))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
 (def
   ^:private
   httpspecdef
@@ -310,34 +326,15 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn HTTP "" ^APersistentMap
+(defn HTTP ""
   ([_ id] (HTTP _ id (HTTPSpec)))
   ([_ id spec]
-   {:pspec (update-in spec
-                      [:conf] expandVarsInForm)
-    :id id
-    :init
-    (fn [me arg]
-      (let [c (:conf (rvtbl (:vtbl @me) :pspec))
-            k (-> me get-server pkey-chars)
-            cfg (prevarCfg (basicfg k c arg))
-            {:keys [publicRootDir pageDir]}
-            (:wsite cfg)
-            pub (io/file (str publicRootDir)
-                         (str pageDir))]
-        (when (dirReadWrite? pub)
-          (log/debug "freemarker tpl root: %s" (fpath pub))
-          (setf! me :ftlCfg (mvc/genFtlConfig {:root pub})))
-        cfg))
-    :start
-    (fn [me _]
-      (let [w (boot! me)]
-        (setf! me :boot w)
-        (.start w (.config ^Config me))))
-    :stop
-    (fn [me]
-      (let [{:keys [boot]} @me]
-        (some-> boot .stop)))}))
+   (mutable<> HttpPluglet
+              {:pspec (update-in spec
+                                 [:conf] expandVarsInForm)
+               :parent _
+               :emAlias id
+               :timer (Timer. true)})))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF

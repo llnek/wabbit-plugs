@@ -22,6 +22,7 @@
 
   (:import [javax.mail.internet MimeMessage]
            [clojure.lang APersistentMap]
+           [czlab.jasal LifeCycle Idable]
            [javax.mail
             Flags$Flag
             Flags
@@ -144,9 +145,9 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- readPop3 "" [^Config co msgs]
+(defn- readPop3 "" [co msgs]
 
-  (let [d? (:deleteMsg? (.config co))]
+  (let [d? (get-in @co [:conf :deleteMsg?])]
     (doseq [^MimeMessage mm  msgs]
       (doto mm
         (.getAllHeaders)
@@ -174,18 +175,6 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- wakePOP3 "" [co]
-
-  (try
-    (connectPop3 co)
-    (scanPop3 co)
-    (catch Throwable _
-      (log/exception _))
-    (finally
-      (closeStore co))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
 (defn- sanitize
   ""
   [pkey {:keys [port deleteMsg?
@@ -197,6 +186,43 @@
       (assoc :port (if (spos? port) port 995))
       (assoc :user (str user ))
       (assoc :passwd (p-text (passwd<> passwd pkey)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+(decl-mutable EmailPluglet
+  Pluglet
+  (hold-event [_ t millis] (scheduleTrigger _ t millis))
+  (get-server [me] (:parent @me))
+  Idable
+  (id [me] (:emAlias @me))
+  LifeCycle
+  (init [me arg]
+    (let [k (-> me get-server pkey-chars)
+          c (get-in @me [:pspec :conf])
+          c2 (prevarCfg (merge c
+                               (sanitize k arg)))]
+      (setf! me :conf c2)
+      (resolveProvider me
+                       (if (:ssl? c2) sslvars vars))))
+  (start [me] (.start me nil))
+  (start [me arg]
+    (->> (:waker @me)
+         (scheduleThreadedLoop me ) (setf! me :loopy )))
+  (stop [me]
+    (stopThreadedLoop (:loopy @me)))
+  (dispose [_]))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+(defn- emailXXX "" [_ id spec sslvars vars wakerFunc]
+  (mutable<> EmailPluglet
+             {:pspec (update-in spec
+                                [:conf]
+                                expandVarsInForm)
+              :timer (Timer. true)
+              :waker wakerFunc
+              :parent _
+              :emAlias id}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -222,28 +248,23 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- emailXXX "" [id spec sslvars vars waker]
-  {:pspec (update-in spec
-                     [:conf] expandVarsInForm)
-   :wake waker
-   :id id
-   :init
-   (fn [me arg]
-     (let [c (:conf (rvtbl (:vtbl @me) :pspec))
-           k (-> me get-server pkey-chars)
-           c2 (prevarCfg (merge c
-                                (sanitize k arg)))]
-       (->> (if (:ssl? c2) sslvars vars)
-            (resolveProvider me))
-       c2))})
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
 (defmacro ^:private connectIMAP "" [co] `(connectPop3 ~co))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defmacro ^:private scanIMAP "" [co] `(scanPop3 ~co))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+(defn- wakePOP3 "" [co]
+
+  (try
+    (connectPop3 co)
+    (scanPop3 co)
+    (catch Throwable _
+      (log/exception _))
+    (finally
+      (closeStore co))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -281,17 +302,17 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn IMAP "" ^czlab.wabbit.xpis.Pluglet
+(defn IMAP ""
   ([_ id] (IMAP _ id (IMAPSpec)))
   ([_ id spec]
-   (emailXXX id spec [cz-imaps imaps] [cz-imap imap] wakeIMAP)))
+   (emailXXX _ id spec [cz-imaps imaps] [cz-imap imap] wakeIMAP)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn POP3 "" ^APersistentMap
+(defn POP3 ""
   ([_ id] (POP3 _ id (POP3Spec)))
   ([_ id spec]
-   (emailXXX id spec [cz-pop3s pop3s] [cz-pop3 pop3] wakePOP3)))
+   (emailXXX _ id spec [cz-pop3s pop3s] [cz-pop3 pop3] wakePOP3)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF

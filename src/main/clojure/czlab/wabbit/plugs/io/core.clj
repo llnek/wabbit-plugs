@@ -61,11 +61,10 @@
 (defn dispatch! ""
   ([evt] (dispatch! evt nil))
   ([evt arg]
-   (log/debug "[%s] event is disp!" (-> evt
-                                        msg-source id??))
+   (log/debug "[%s] event is disp!" (id?? (:source evt)))
    (let
-     [^Config src (msg-source evt)
-      cfg (.config src)
+     [src (:source evt)
+      cfg (:conf @src)
       c0 (:handler cfg)
       c1 (:handler arg)
       ctr (get-server src)
@@ -91,6 +90,18 @@
                (exec-with job))
            :else
            (processOrphan job)))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+(defn scheduleTrigger
+
+  ""
+  [^Timer timer
+   ^Triggerable trig ^long millis]
+
+  (if (and timer (spos? millis))
+    (let [k (tmtask<> #(.fire trig))]
+      (.schedule t k millis) (.setTrigger trig k))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF

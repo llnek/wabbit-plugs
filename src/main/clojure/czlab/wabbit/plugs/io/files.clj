@@ -24,7 +24,7 @@
   (:import [java.io FileFilter File IOException]
            [java.util Properties ResourceBundle]
            [clojure.lang APersistentMap]
-           [czlab.jasal Config]
+           [czlab.jasal LifeCycle Idable]
            [org.apache.commons.io.filefilter
             SuffixFileFilter
             PrefixFileFilter
@@ -115,7 +115,7 @@
     [{:keys [targetFolder
              intervalSecs
              ^FileFilter fmask] :as cfg}
-     (.config me)
+     (.config plug)
      obs (-> (io/file targetFolder)
              (FileAlterationObserver. fmask))
      mon (-> (s2ms intervalSecs) FileAlterationMonitor.)]
@@ -130,6 +130,28 @@
       (.addListener obs ))
     (.addObserver mon obs)
     mon))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+(decl-mutable FilePickerPluglet
+  Idable
+  (id [me] (:emAlias @me))
+  LifeCycle
+  (init [me carg]
+    (-> (get-in @me [:pspec :conf])
+        (init2 carg)
+        (prevarCfg)
+        (setf! me :conf)))
+  (start [me] (.start me nil))
+  (start [me arg]
+    (let [w #(doto->> (fileMon<> me) (setf! me :mon) .start)]
+      (log/info "apache io monitor starting...")
+      (configTimer (:timer @me) w (.config me) false)))
+  (dispose [_])
+  (stop [me]
+    (log/info "apache io monitor stopping...")
+    (cancelTimer (:timer @me))
+    (some-> ^FileAlterationMonitor (:mon @me) .stop)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -156,23 +178,12 @@
 
   ([_ id] (FilePicker _ id (FilePickerSpec)))
   ([_ id spec]
-   {:pspec (update-in spec
-                      [:conf] expandVarsInForm)
-    :id id
-    :schedule
-    (fn [me _]
-      (log/info "apache io monitor starting...")
-      (doto->> (fileMon<> me)
-               (setf! me :mon ) .start))
-    :id id
-    :init
-    (fn [me carg]
-      (-> (:vtbl @me) (rvtbl :pspec) :conf (init2 carg) prevarCfg ))
-    :stop
-    (fn [me]
-      (log/info "apache io monitor stopping...")
-      (some-> ^FileAlterationMonitor
-              (unsetf! me :mon) .stop))}))
+   (mutable<> FilePickerPluglet
+              {:pspec (update-in spec
+                                 [:conf] expandVarsInForm)
+               :parent _
+               :timer (Timer. true)
+               :emAlias id })))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF
