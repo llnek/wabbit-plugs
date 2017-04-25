@@ -16,7 +16,6 @@
 
   (:use [czlab.wabbit.base]
         [czlab.wabbit.xpis]
-        [czlab.flux.wflow]
         [czlab.basal.core]
         [czlab.basal.meta]
         [czlab.basal.str])
@@ -31,12 +30,12 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- processOrphan ""
-  ([job] (processOrphan job nil))
-  ([job ^Throwable e]
-   (let [evt (rootage job)]
+  ([evt] (processOrphan evt nil))
+  ([evt ^Throwable e]
+   (let []
      (some-> e log/exception )
      (log/error (str "event [%s] "
-                     "job#%s dropped") (gtid evt) (id?? job)))))
+                     "job#%s dropped") (gtid evt) (id?? evt)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -49,47 +48,41 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- error!
-  "" [pglet job e]
+  "" [pglet evt e]
   (if-some+
-    [r (strKW (:eror (plug-spec pglet)))]
+    [r (strKW (get-in pglet
+                      [:pspec :eror]))]
     (.callEx ^Cljrt
              (-> pglet
-                 get-server cljrt) r (vargs* Object job e))))
+                 get-server cljrt) r (vargs* Object evt e))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn dispatch! ""
   ([evt] (dispatch! evt nil))
   ([evt arg]
-   (log/debug "[%s] event is disp!" (id?? (:source evt)))
    (let
-     [src (:source evt)
-      cfg (:conf @src)
+     [plug (:source evt)
+      cfg (:conf @plug)
       c0 (:handler cfg)
       c1 (:handler arg)
-      ctr (get-server src)
-      ^Cljrt rts (cljrt ctr)
       cb (or c1 c0)
       _ (assert (ifn? cb))
-      job (job<> (scheduler ctr) nil evt)
-      wf (or
-           (try! (.callVar rts cb))
-           (error! src job nil))]
+      ^Cljrt rts (-> plug
+                     get-server cljrt)
+      wf (or (try! (.callVar rts cb))
+             (error! src evt nil))]
+     (log/debug "[%s] event is disp!" (id?? plug))
      (log/debug
        (str "source = %s\n"
             "arg = %s\n"
-            "cb = %s") (gtid src) arg cb)
+            "cb = %s") (gtid plug) arg cb)
      (try
-       (log/debug "#%s => %s" (id?? job) (id?? src))
+       (log/debug "#%s => %s" (id?? evt) (id?? plug))
        (do->nil
-         (cond
-           (satisfies? Workstream wf)
-           (exec-with wf job)
-           (fn? wf)
-           (-> (workstream<> (script<> #(wf %2) ))
-               (exec-with job))
-           :else
-           (processOrphan job)))))))
+         (if (fn? wf)
+           (wf evt)
+           (processOrphan evt)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

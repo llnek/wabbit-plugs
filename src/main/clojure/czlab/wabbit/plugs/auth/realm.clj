@@ -19,12 +19,12 @@
    :exposes-methods { }
    :state myState)
 
-  (:require [czlab.twisty.codec :refer [passwd<>]]
+  (:require [czlab.twisty.codec :refer [pwd<>]]
             [czlab.basal.logging :as log])
 
   (:use [czlab.wabbit.plugs.auth.core]
-        [czlab.horde.dbio.connect]
-        [czlab.horde.dbio.core])
+        [czlab.horde.connect]
+        [czlab.horde.core])
 
   (:import [org.apache.shiro.realm CachingRealm AuthorizingRealm]
            [org.apache.shiro.subject PrincipalCollection]
@@ -35,7 +35,6 @@
             SimpleAccount
             AuthenticationToken
             AuthenticationException]
-           [czlab.horde DbApi]
            [java.util Collection]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -53,7 +52,7 @@
   (let [db (dbapi<> *jdbc-pool* *meta-cache*)
         ;;pwd (.getCredentials token)
         user (.getPrincipal token)
-        sql (.simpleSQLr db)]
+        sql (simple-sqlr db)]
     (when-some [acc (findLoginAccount sql user)]
       (SimpleAccount. acc
                       (:passwd acc)
@@ -69,7 +68,7 @@
         rc (SimpleAccount. acc
                            (:passwd acc)
                            (.getName this))
-        sql (.simpleSQLr db)
+        sql (simple-sqlr db)
         j :czlab.wabbit.auth.model/AccountRoles]
     (let [rs (dbGetM2M {:joined j :with sql} acc) ]
       (doseq [r rs]

@@ -90,7 +90,8 @@
 ;;
 (decl-mutable SocketPluglet
   Pluglet
-  (hold-event [_ t millis] (scheduleTrigger _ t millis))
+  (hold-event [me t millis] (some-> (:timer @me)
+                                    (scheduleTrigger t millis)))
   (get-server [me] (:parent @me))
   Idable
   (id [me] (:emAlias @me))
@@ -126,10 +127,10 @@
               {:pspec (update-in spec
                                  [:conf]
                                  expandVarsInForm)
-               :timer (Timer. true)
                :parent _
                :emAlias id})))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF
+
 

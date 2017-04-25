@@ -16,16 +16,10 @@
             [czlab.basal.str :refer [toKW]]
             [czlab.basal.logging :as log])
 
-  (:use [czlab.horde.dbddl.postgresql]
-        [czlab.horde.dbddl.sqlserver]
-        [czlab.horde.dbddl.drivers]
-        [czlab.horde.dbio.core]
-        [czlab.horde.dbddl.h2]
-        [czlab.horde.dbddl.mysql]
-        [czlab.horde.dbddl.oracle])
+  (:use [czlab.horde.drivers]
+        [czlab.horde.core])
 
-  (:import [czlab.horde JdbcSpec JdbcPool Schema]
-           [java.sql Connection]
+  (:import [java.sql Connection]
            [java.io File]
            [czlab.jasal I18N]))
 
@@ -80,28 +74,30 @@
   [spec]
   {:pre [(keyword? spec)]}
 
-  (if (contains? *db-types* spec)
+  (if (in? *db-types* spec)
     (getDdl *auth-meta-cache* spec)
     (dberr! (rstr (I18N/base) "db.unknown" (name spec)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defprotocol PlugletDDL "Upload the auth-pluglet ddl to db" (applyDDL [_]))
+(defmulti applyDDL "" (fn [a] (class a)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(extend-protocol PlugletDDL
-
+(defmethod applyDDL
   JdbcSpec
-  (applyDDL [this]
-    (when-some [t (matchUrl (.url this))]
-      (with-open [c (dbconnect<> this)]
-        (uploadDdl c (genAuthPlugletDDL t)))))
+  [spec]
+  (when-some [t (matchUrl (:url spec))]
+    (with-open [c (dbconnect<> spec)]
+      (uploadDdl c (genAuthPlugletDDL t)))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+(defmethod applyDDL
   JdbcPool
-  (applyDDL [this]
-    (when-some [t (matchUrl (.dbUrl this))]
-      (uploadDdl this (genAuthPlugletDDL t)))))
+  [pool]
+  (when-some [t (matchUrl (:dbUrl pool))]
+    (uploadDdl pool (genAuthPlugletDDL t))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
