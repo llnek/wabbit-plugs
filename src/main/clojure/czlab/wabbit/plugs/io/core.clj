@@ -79,18 +79,6 @@
          (.run ^Schedulable sc (run-able+id<> pid (v evt)))
          (processOrphan evt))))))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-(defn scheduleTrigger
-
-  ""
-  [^Timer timer
-   ^Triggerable trig ^long millis]
-
-  (if (and timer (spos? millis))
-    (let [k (tmtask<> #(.fire trig))]
-      (.schedule t k millis) (.setTrigger trig k))))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF
 

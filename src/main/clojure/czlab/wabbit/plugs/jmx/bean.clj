@@ -35,15 +35,15 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;(set! *warn-on-reflection* true)
 
-(decl-mutable NameParams
+(decl-object NameParams
   Object
   (toString [me]
-    (let [{:keys [name params]} @me]
+    (let [{:keys [name params]} me]
       (if (empty? params)
         name
         (str name "/" (cs/join "#" params)))))
   (hashCode [me]
-    (let [{:keys [name params]} @me]
+    (let [{:keys [name params]} me]
       (int (reduce
              #(+ %1 (.hashCode %2))
              (* 31 (+ 31 (.hashCode name)))
@@ -51,16 +51,16 @@
   (equals [me obj]
     (and obj
          (= (.getClass me) (.getClass obj))
-         (= (:name @me) (:name @obj))
-         (= (:params @me) (:params @obj)))))
+         (= (:name me) (:name obj))
+         (= (:params me) (:params obj)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn nameParams<> ""
   ([name] (nameParams<> name nil))
   ([name pms]
-   (mutable<> NameParams
-              {:name name :params (or pms [])})))
+   (object<> NameParams
+             {:name name :params (or pms [])})))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

@@ -11,10 +11,9 @@
 
   czlab.wabbit.plugs.io.http
 
-  (:require [czlab.basal.io :refer [dirReadWrite? xdata<> slurpUtf8]]
-            [czlab.convoy.util :refer [parseBasicAuth]]
+  (:require [czlab.convoy.util :refer [parseBasicAuth]]
             [czlab.basal.format :refer [readEdn]]
-            [czlab.twisty.codec :refer [passwd<>]]
+            [czlab.twisty.codec :refer [pwd<>]]
             [czlab.basal.logging :as log]
             [czlab.wabbit.plugs.io.mvc :as mvc]
             [clojure.java.io :as io]
@@ -28,7 +27,6 @@
         [czlab.convoy.wess]
         [czlab.convoy.server]
         [czlab.convoy.routes]
-        [czlab.flux.wflow]
         [czlab.twisty.ssl]
         [czlab.basal.core]
         [czlab.basal.io]
@@ -49,7 +47,10 @@
            [io.netty.handler.ssl SslHandler]
            [clojure.lang Atom APersistentMap]
            [czlab.nettio InboundHandler]
-           [czlab.jasal LifeCycle Idable]
+           [czlab.jasal
+            LifeCycle
+            Idable
+            Hierarchical]
            [czlab.basal Cljrt]
            [java.util Timer TimerTask]
            [io.netty.handler.codec.http
@@ -105,7 +106,9 @@
 (defn scanBasicAuth
   "Scan and parse if exists basic authentication"
   ^APersistentMap
-  [evt] (if-some+ [v (msgHeader evt auth-token)] (parseBasicAuth v)))
+  [evt]
+  (if-some+
+    [v (msgHeader evt auth-token)] (parseBasicAuth v)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -115,11 +118,9 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- resumeOnExpiry
-  "" [^Channel ch evt]
+(defn- resumeOnExpiry "" [evt]
   (try
-    (->> (http-result ch evt HttpResponseStatus/INTERNAL_SERVER_ERROR)
-         (reply-result ch))
+    (replyStatus (:socket evt) 500)
     (catch ClosedChannelException _
       (log/warn "channel closed already"))
     (catch Throwable t# (log/exception t#))))
@@ -130,22 +131,8 @@
   (merge msg
          {:id (str "WsockMsg." (seqint2))
           :socket ch
-          :source co
+          :$source co
           :ssl? (maybeSSL? ch) }))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-(decl-mutable XXXHttpEventObj
-  Triggerable
-  (setTrigger [me t]
-    (setf! me  :trigger t))
-  (cancel [me]
-    (some-> (unsetf! me :trigger) cancelTimerTask))
-  (fire [me _]
-    (when-some [t (unsetf! me :trigger)]
-      (setf! me :stale? true)
-      (cancelTimerTask t)
-      (resumeOnExpiry (:socket me) me))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -154,20 +141,19 @@
     [{:keys [wantSession? session]}
      (:conf @co)
      {:keys [route cookies]} req]
-    (->>
-      {:session (if (and (!false? wantSession?)
-                         (some-> ^IDeref
-                                 (:info route)
-                                 .deref :wantSession?))
-                  (upstream (-> co get-server pkey-bytes)
-                            cookies
-                            (:macit? @session)))
-       :source co
-       :stale? false
-       :id (str "HttpMsg." (seqint2))}
-      (merge req))))
+    (merge req
+           {:session (if (and (!false? wantSession?)
+                              (some-> ^IDeref
+                                      (:info route)
+                                      .deref :wantSession?))
+                       (upstream (-> co get-server pkey-bytes)
+                                 cookies
+                                 (if session (:macit? @session))))
+            :$source co
+            :stale? false
+            :id (str "HttpMsg." (seqint2)) })))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- evt<>
   "" [co {:keys [ch msg]}]
@@ -181,23 +167,22 @@
 ;;
 (defn- boot! "" ^LifeCycle [co]
   (let
-    [asset! (with-open [clj (Cljrt/newrt (getCldr))]
-              (.varIt clj
-                      "czlab.wabbit.plugs.io.mvc/asset!"))
+    [asset! #'czlab.wabbit.plugs.io.mvc/asset!
      {:keys [waitMillis] :as cfg}
      (:conf @co)
      w (nettyWebServer<>)]
     (->>
-      (fn [_]
-        {:h1
-         (proxy [InboundHandler][]
-           (channelRead0 [ctx msg]
-             (let [ev (evt<> co msg)
-                   {:keys [static? handler]}
-                   (some-> ^IDeref
-                           (:info (:route @ev)) .deref)
-                   hd (if (and static?
-                               (nil? handler)) asset! handler)]
+      #(let [_ %1]
+         {:h1
+          (proxy [InboundHandler][]
+            (channelRead0 [ctx msg]
+              (let [ev (evt<> co msg)
+                    {:keys [static? handler]}
+                    (some-> ^IDeref
+                            (get-in msg
+                                    [:route :info]) .deref)
+                    hd (if (and static?
+                                (nil? handler)) asset! handler)]
                (if (spos? waitMillis)
                  (hold-event co ev waitMillis))
                (dispatch! ev {:handler hd}))))})
@@ -208,13 +193,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn processOrphan
-  "" [job error]
+  "" [evt error]
   ;; 500 or 503
-  (let [s (or (:statusCode @job) 500)
-        evt (rootage job)
-        ch (socket evt)]
-    (->> (http-result ch evt s)
-         (reply-result ch ))))
+  (let [ch (:socket evt)] (replyStatus ch 500)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -241,13 +222,15 @@
     (->>
       {:port (if-not (spos? port) (if ssl? 443 80) port)
        :routes (maybeLoadRoutes cfg)
-       :passwd (p-text (passwd<> passwd pkey))
+       :passwd (p-text (pwd<> passwd pkey))
        :serverKey (if ssl? (io/as-url serverKey))}
       (merge cfg ))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (decl-mutable HttpPluglet
+  Hierarchical
+  (getParent [me] (:parent @me))
   Idable
   (id [me] (:emAlias @me))
   LifeCycle
@@ -262,13 +245,13 @@
       (when (dirReadWrite? pub)
         (log/debug "freemarker tpl root: %s" (fpath pub))
         (setf! me :ftlCfg (mvc/genFtlConfig {:root pub})))
-      cfg))
+      (setf! me :conf cfg)))
   (start [me] (.start me nil))
   (start [me arg]
     (let [w (boot! me)]
       (setf! me :boot w)
       (.start w (:conf @me))))
-  (dispose [_])
+  (dispose [me] (.stop me))
   (stop [me]
     (let [{:keys [boot]} @me]
       (some-> boot .stop))))
@@ -279,7 +262,7 @@
   ^:private
   httpspecdef
   {:deps {:$auth [:czlab.wabbit.plugs.auth.core/WebAuth]}
-   :eror :czlab.wabbit.plugs.io.http/processOrphan
+   :error :czlab.wabbit.plugs.io.http/processOrphan
    :info {:name "Web Site"
           :version "1.0.0"}
    :conf {:maxInMemory (* 1024 1024 4)

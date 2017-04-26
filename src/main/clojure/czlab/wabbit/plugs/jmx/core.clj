@@ -24,6 +24,11 @@
            [java.lang.management ManagementFactory]
            [java.rmi.server UnicastRemoteObject]
            [java.rmi NoSuchObjectException]
+           [czlab.jasal
+            Resetable
+            LifeCycle
+            Idable
+            Hierarchical]
            [java.util HashMap]
            [javax.management.remote
             JMXConnectorServer
@@ -74,9 +79,9 @@
 ;;
 (defn- startRMI "" [plug]
   (try
-    (->> (long (get-in @plug [:conf :registryPort]))
+    (->> ^long (get-in @plug [:conf :registryPort])
          LocateRegistry/createRegistry
-         (setf! me  :rmi ))
+         (setf! me :rmi))
     (catch Throwable _
       (mkJMXrror "Failed to create RMI registry" _))))
 
@@ -130,9 +135,8 @@
            (conj (:objNames @me))
            (setf! me :objNames))
       nm))
-  Pluglet
-  (get-server [me] (:parent @me))
-  (hold-event [_ _ _])
+  Hierarchical
+  (getParent [me] (:parent @me))
   Idable
   (id [me] (:emAlias @me))
   Resetable
@@ -145,22 +149,20 @@
     (setf! me :conf (prevarCfg (or arg {}))))
   (start [me] (.start me nil))
   (start [me _]
-    (startRMI me)
-    (startJMX me)
+    (doto->> me startRMI startJMX )
     (log/info "JmxPluglet started"))
   (stop [me]
     (let [^JMXConnectorServer c (:conn @me)
           ^Registry r (:rmi @me)]
       (.reset me)
       (try! (some-> c .stop ))
-      (unsetf! me :conn)
       (try!
         (some-> r
                 (UnicastRemoteObject/unexportObject  true)))
-      (unsetf! me :rmi)
       (log/info "JmxPluglet stopped")))
-  (dispose [_]
-    (log/info "JmxPluglet disposed")))
+  (dispose [me]
+           (.stop me)
+           (log/info "JmxPluglet disposed")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -181,11 +183,11 @@
 (defn JmxMonitor "" [ctr pid]
   (mutable<> JmsPlugletObj
              {:pspec (update-in specdef
-                                 [:conf]
-                                 expandVarsInForm)
+                                [:conf]
+                                expandVarsInForm)
               :parent ctr
               :emAlias pid
-              :objNames []}))
+              :objNames [] }))
 
 ;; jconsole port
 ;;(setRegistryPort [_ p] (.setv impl :registryPort p))
