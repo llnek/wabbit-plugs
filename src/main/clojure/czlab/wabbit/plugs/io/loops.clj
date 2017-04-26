@@ -30,56 +30,47 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- configRepeat
-  ""
-  ^TimerTask
+(defn- cfgRepeat
+  "" ^TimerTask
   [^Timer timer [dw ds] ^long intv func]
 
   (log/info "Scheduling a *repeating* timer: %dms" intv)
-  (let [tt (tmtask<> func)]
-    (if (spos? intv)
-      (if
-        (ist? Date dw)
+  (if (spos? intv)
+    (let [tt (tmtask<> func)]
+      (if (ist? Date dw)
         (.schedule timer tt ^Date dw intv)
-        ;else
         (.schedule timer
                    tt
-                   (long (if (spos? ds) ds 1000)) intv)))
-    tt))
+                   ^long (if (spos? ds) ds 1000) intv)) tt)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- configOnce
-  ""
-  ^TimerTask
+(defn- cfgOnce
+  "" ^TimerTask
   [^Timer timer [dw ds] func]
 
   (log/info "Scheduling a *one-shot* timer at %s" [dw ds])
   (let [tt (tmtask<> func)]
-    (if
-      (ist? Date dw)
+    (if (ist? Date dw)
       (.schedule timer tt ^Date dw)
-      ;else
       (.schedule timer
                  tt
-                 (long (if (spos? ds) ds 1000))))
-    tt))
+                 ^long (if (spos? ds) ds 1000))) tt))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn configTimer
-  ""
-  ^TimerTask
+(defn cfgTimer
+  "" ^TimerTask
   [timer wakeup {:keys [intervalSecs
                         delayWhen
-                        delaySecs] :as cfg} repeat?]
+                        delaySecs]} repeat?]
   (let [d [delayWhen (s2ms delaySecs)]]
     (if (and repeat?
              (spos? intervalSecs))
-      (configRepeat timer
-                    d
-                    (s2ms intervalSecs) wakeup)
-      (configOnce timer d wakeup))))
+      (cfgRepeat timer
+                 d
+                 (s2ms intervalSecs) wakeup)
+      (cfgOnce timer d wakeup))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -92,7 +83,7 @@
              (fn [_]
                (while @loopy
                  (waker me) (pause ms))))]
-    (configTimer (:timer @plug) w cfg false)
+    (cfgTimer (Timer. true) w cfg false)
     loopy))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -101,40 +92,41 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
+(decl-object TimerMsg
+             PlugletMsg
+             (get-pluglet [me] (:$source me)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+(defmacro ^:private evt<> "" [co repeat?]
+  `(object<> TimerMsg
+             {:id (str "TimerMsg." (seqint2))
+              :$source ~co
+              :tstamp (now<>) }))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
 (decl-mutable TimerPluglet
   Pluglet
-  (hold-event [_ t millis] (scheduleTrigger _ t millis))
+  (hold-event [_ _ _] (throwUOE "timer-pluglet:hold-event"))
   (get-server [me] (:parent @me))
   Idable
   (id [me] (:emAlias @me))
   LifeCycle
   (init [me arg]
     (let [c (get-in @me [:pspec :conf])]
-      (doto->> (prevarCfg (merge c arg))
-               (setf! me :conf))))
+      (->> (prevarCfg (merge c arg))
+           (setf! me :conf))))
   (start [me] (.start me nil))
   (start [me arg]
-    (let [r? (:repeatable? @me)]
-      (->> (configTimer (:timer @me)
-                        #(dispatch! (evt<> me r?))
-                        (:conf @me) r?)
+    (let [r? (:repeat? @me)]
+      (->> (cfgTimer (Timer. true)
+                     #(dispatch! (evt<> me r?))
+                     (:conf @me) r?)
            (setf! me :ttask))))
   (stop [me]
-    (cancelTimer (:timer @me)))
-  (dispose [_]))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-(decl-object TimerMsg)
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-(defn- evt<> [co repeat?]
-  (object<> TimerMsg
-            {:id (str "TimerMsg." (seqint2))
-             :tstamp (now<>)
-             :source co
-             :isRepeating? repeat?} ))
+    (cancelTimerTask (:ttask @me)))
+  (dispose [me] (.stop me)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -161,18 +153,13 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- cancelTimer "" [^TimerTask tt] (try! (some-> tt .cancel)))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
 (defn- xxxTimer<> "" [_ id spec repeat?]
   (mutable<> TimerPluglet
              {:pspec (update-in spec
                                 [:conf] expandVarsInForm)
-              :timer (Timer. true)
               :parent _
               :emAlias id
-              :repeatable? repeat?}))
+              :repeat? repeat?}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

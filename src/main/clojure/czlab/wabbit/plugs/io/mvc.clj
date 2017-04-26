@@ -17,13 +17,12 @@
             [clojure.java.io :as io])
 
   (:use [czlab.convoy.nettio.resp]
-        [czlab.wabbit.base.core]
-        [czlab.convoy.net.core]
-        [czlab.convoy.net.wess]
+        [czlab.wabbit.base]
+        [czlab.convoy.core]
+        [czlab.convoy.wess]
         [czlab.basal.core]
         [czlab.basal.io]
         [czlab.basal.str]
-        [czlab.flux.wflow.core]
         [czlab.wabbit.plugs.io.core])
 
   (:import [clojure.lang APersistentMap]
@@ -40,13 +39,6 @@
             Configuration
             DefaultObjectWrapper]
            [java.net HttpCookie]
-           [czlab.convoy.net
-            WebContent
-            HttpResult
-            AuthError
-            RouteInfo
-            HttpSession
-            RouteCracker]
            [java.util Date]
            [java.io File Writer StringWriter]))
 
@@ -167,11 +159,11 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn loadTemplate
-  "" ^APersistentMap [^Config co tpath data]
+  "" ^APersistentMap [co tpath data]
 
   (let
     [ts (str "/" (triml tpath "/"))
-     c (:$ftlCfg (.config co))
+     c (:$ftlCfg @co)
      out (renderFtl c ts data)]
     {:data (xdata<> out)
      :ctype
@@ -209,68 +201,57 @@
 ;;
 (defn- getStatic
   ""
-  [^HttpMsg evt file]
+  [res file]
   (let
-    [^Config co (:source evt)
-     cfg (.config co)
-     ^Channel ch (:socket evt)
-     res (http-result evt)
+    [evt (:request res)
+     ch (:socket evt)
+     co (get-pluglet evt)
+     cfg (:conf @co)
      fp (io/file file)]
     (log/debug "serving file: %s" (fpath fp))
     (try
       (if (or (nil? fp)
               (not (.exists fp)))
-        (do
-          (set-res-status res 404)
-          (reply-result res))
-        (do
-          (set-res-content res fp)
-          (reply-result res)))
+        (-> (assoc res :status 404) reply-result)
+        (-> (assoc res :body fp) reply-result ))
       (catch Throwable e#
         (log/error e# "get: %s" (:uri evt))
         (try!
-          (set-res-status res 500)
-          (set-res-content res nil)
-          (reply-result res))))))
+          (-> (assoc res :body nil :status 500) reply-result ))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(def ^:private asset-handler
-  (workstream<>
-    #(let
-       [^HttpMsg evt (rootage %1)
-        ^Config co (:source evt)
-        {{:keys [publicRootDir]} :wsite :as cfg}
-        (.config co)
-        homeDir (fpath (-> co get-server get-home-dir))
-        r (:route evt)
-        mp (str (some-> ^RouteInfo
-                        (:info r) :mountPoint))
-        ;;need to do this for testing only since expandvars
-        ;;not called
-        publicRootDir (expandVars publicRootDir)
-        pubDir (io/file publicRootDir)
-        fp (-> (reduce
-                 (fn [a b] (cs/replace-first a "{}" b))
-                 mp (:groups r))
-               maybeStripUrlCrap
-               strim)
-        ffile (io/file pubDir fp)
-        check? (:fileAccessCheck? cfg)]
-       (log/info "request for asset: dir=%s, fp=%s" publicRootDir fp)
-       (if (and (hgl? fp)
-                (or (false? check?)
-                    (.startsWith (fpath ffile)
-                                 (fpath pubDir))))
-         (getStatic evt ffile)
-         (let [ch (:socket evt)]
-           (log/warn "illegal uri access: %s" fp)
-           (-> (http-result evt 403)
-               (reply-result )))))))
+(defn- assetHandler "" [evt res]
+  (let
+    [co (get-pluglet evt)
+     {{:keys [publicRootDir]} :wsite :as cfg}
+     (:conf @co)
+     homeDir (fpath (-> co get-server get-home-dir))
+     r (:route evt)
+     mp (str (some-> ^RouteInfo
+                     (:info r) :mountPoint))
+     ;;need to do this for testing only since expandvars
+     ;;not called
+     publicRootDir (expandVars publicRootDir)
+     pubDir (io/file publicRootDir)
+     fp (-> (reduce
+              #(cs/replace-first %1 "{}" %2) mp (:groups r))
+            maybeStripUrlCrap strim)
+     ffile (io/file pubDir fp)
+     check? (:fileAccessCheck? cfg)]
+    (log/info "request for asset: dir=%s, fp=%s" publicRootDir fp)
+    (if (and (hgl? fp)
+             (or (false? check?)
+                 (.startsWith (fpath ffile)
+                              (fpath pubDir))))
+      (getStatic res ffile)
+      (let [ch (:socket evt)]
+        (log/warn "illegal uri access: %s" fp)
+        (-> (assoc res :status 403) reply-result )))))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn asset! "" [] asset-handler)
+(defn asset! "" [] assetHandler)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF

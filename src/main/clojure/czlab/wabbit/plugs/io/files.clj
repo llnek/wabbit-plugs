@@ -40,19 +40,20 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;(set! *warn-on-reflection* false)
 
-(decl-object FileMsg)
+(decl-object FileMsg
+             PlugletMsg
+             (get-pluglet [me] (:$source me)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- evt<>
+(defmacro ^:private evt<>
   ""
   [co fname fp action]
-
-  (object<> FileMsg
-            {:file (io/file fp)
-             :source co
-             :originalFileName fname
-             :id (str "FileMsg." (seqint2))}))
+  `(object<> FileMsg
+             {:file (io/file ~fp)
+              :$source ~co
+              :originalFileName ~fname
+              :id (str "FileMsg." (seqint2))}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -110,23 +111,24 @@
 (defn- fileMon<>
   ""
   ^FileAlterationMonitor
-  [^Config plug]
+  [plug]
   (let
     [{:keys [targetFolder
+             recvFolder
              intervalSecs
-             ^FileFilter fmask] :as cfg}
-     (.config plug)
+             ^FileFilter fmask]}
+     (:conf @plug)
      obs (-> (io/file targetFolder)
              (FileAlterationObserver. fmask))
      mon (-> (s2ms intervalSecs) FileAlterationMonitor.)]
     (->>
       (proxy [FileAlterationListenerAdaptor][]
         (onFileCreate [f]
-          (postPoll plug cfg f :FP-CREATED))
+          (postPoll plug recvFolder f :FP-CREATED))
         (onFileChange [f]
-          (postPoll plug cfg f :FP-CHANGED))
+          (postPoll plug recvFolder f :FP-CHANGED))
         (onFileDelete [f]
-          (postPoll plug cfg f :FP-DELETED)))
+          (postPoll plug recvFolder f :FP-DELETED)))
       (.addListener obs ))
     (.addObserver mon obs)
     mon))
@@ -134,6 +136,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (decl-mutable FilePickerPluglet
+  Pluglet
+  (hold-event [_ _ _] (throwUOE "file-picker:hold-event"))
+  (get-server [me] (:parent @me))
   Idable
   (id [me] (:emAlias @me))
   LifeCycle
@@ -146,11 +151,13 @@
   (start [me arg]
     (let [w #(doto->> (fileMon<> me) (setf! me :mon) .start)]
       (log/info "apache io monitor starting...")
-      (configTimer (:timer @me) w (.config me) false)))
-  (dispose [_])
+      (->> (configTimer (Timer. true) w (:conf @me) false)
+           (setf! me :ttask))))
+  (dispose [me]
+           (.stop me))
   (stop [me]
     (log/info "apache io monitor stopping...")
-    (cancelTimer (:timer @me))
+    (cancelTimerTask (:ttask @me))
     (some-> ^FileAlterationMonitor (:mon @me) .stop)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -174,7 +181,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn FilePicker "" ^APersistentMap
+(defn FilePicker ""
 
   ([_ id] (FilePicker _ id (FilePickerSpec)))
   ([_ id spec]
@@ -182,7 +189,6 @@
               {:pspec (update-in spec
                                  [:conf] expandVarsInForm)
                :parent _
-               :timer (Timer. true)
                :emAlias id })))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

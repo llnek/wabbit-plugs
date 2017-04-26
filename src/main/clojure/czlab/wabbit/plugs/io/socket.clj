@@ -31,19 +31,20 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (decl-object TcpMsg
-  Disposable
-  (dispose [me]
-           (closeQ (:socket me))))
+             PlugletMsg
+             (get-pluglet [me] (:$source me))
+             Disposable
+             (dispose [me]
+                      (closeQ (:socket me))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- evt<>
-  "" [co ^Socket socket]
+(defn- evt<> "" [co ^Socket socket]
   (object<> TcpMsg
             {:sockout (.getOutputStream socket)
              :sockin (.getInputStream socket)
              :id (str "TcpMsg." (seqint2))
-             :source co
+             :$source co
              :socket socket}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -90,8 +91,7 @@
 ;;
 (decl-mutable SocketPluglet
   Pluglet
-  (hold-event [me t millis] (some-> (:timer @me)
-                                    (scheduleTrigger t millis)))
+  (hold-event [_ _ _] (throwUOE "socket-pluglet:hold-event"))
   (get-server [me] (:parent @me))
   Idable
   (id [me] (:emAlias @me))
@@ -114,7 +114,7 @@
     (let [c (get-in @me [:pspec :conf])]
       (doto->> (prevarCfg (merge c arg))
                (setf! me :conf))))
-  (dispose [_])
+  (dispose [me] (.stop me))
   (stop [me]
     (closeQ (:ssoc @me))))
 

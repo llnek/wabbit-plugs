@@ -11,7 +11,7 @@
 
   czlab.wabbit.plugs.io.jms
 
-  (:require [czlab.twisty.codec :refer [passwd<>]]
+  (:require [czlab.twisty.codec :refer [pwd<>]]
             [czlab.basal.logging :as log])
 
   (:use [czlab.wabbit.base]
@@ -47,23 +47,25 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;(set! *warn-on-reflection* true)
 
-(decl-object JmsMsg)
+(decl-object JmsMsg
+             PlugletMsg
+             (get-pluglet [me] (:$source me)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- evt<>
+(defmacro ^:private evt<>
   "" [co msg]
 
-  (object<> JmsMsg
-            {:id (str "JmsMsg." (seqint2))
-             :source co
-             :message msg }))
+  `(object<> JmsMsg
+             {:id (str "JmsMsg." (seqint2))
+              :$source ~co
+              :message ~msg }))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- onMsg "" [co msg]
+(defmacro ^:private onMsg "" [co msg]
   ;;if (msg!=null) block { () => msg.acknowledge() }
-  (dispatch! (evt<> co msg)))
+  `(dispatch! (evt<> ~co ~msg)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -72,20 +74,16 @@
   [co ^InitialContext ctx ^ConnectionFactory cf]
 
   (let
-    [{:keys [^String destination
-             ^String jmsPwd
-             ^String jmsUser]}
+    [{:keys [destination jmsPwd jmsUser]}
      (:conf @co)
-     pwd (->> (get-server co)
-              (pkey-chars)
-              (passwd<> jmsPwd)
-              (p-text))
-     c (.lookup ctx destination)
+     pwd (->> co get-server
+              pkey-chars (pwd<> jmsPwd) p-text)
+     c (.lookup ctx ^String destination)
      ^Connection
      conn (if (hgl? jmsUser)
             (.createConnection
               cf
-              jmsUser
+              ^String jmsUser
               (stror (strit pwd) nil))
             (.createConnection cf))]
     (if (ist? Destination c)
@@ -105,24 +103,19 @@
   [co ^InitialContext ctx ^TopicConnectionFactory cf]
 
   (let
-    [{:keys [^String destination
-             ^String jmsUser
-             durable?
-             ^String jmsPwd]}
+    [{:keys [destination jmsUser durable? jmsPwd]}
      (:conf @co)
-     pwd (->> (get-server me)
-              (pkey-chars)
-              (passwd<> jmsPwd)
-              (p-text))
+     pwd (->> co get-server
+              pkey-chars (pwd<> jmsPwd) p-text)
      conn (if (hgl? jmsUser)
             (.createTopicConnection
               cf
-              jmsUser
+              ^String jmsUser
               (stror (strit pwd) nil))
             (.createTopicConnection cf))
      s (.createTopicSession
          conn false Session/CLIENT_ACKNOWLEDGE)
-     t (.lookup ctx destination)]
+     t (.lookup ctx ^String destination)]
     (if-not (ist? Topic t)
       (throwIOE "Object not of Topic type"))
     (-> (if durable?
@@ -140,23 +133,19 @@
   [co ^InitialContext ctx ^QueueConnectionFactory cf]
 
   (let
-    [{:keys [^String destination
-             ^String jmsUser
-             ^String jmsPwd]}
+    [{:keys [destination jmsUser jmsPwd]}
      (:conf @co)
-     pwd (->> (get-server me)
-              (pkey-chars)
-              (passwd<> jmsPwd)
-              (p-text))
+     pwd (->> co get-server
+              pkey-chars (pwd<> jmsPwd) p-text)
      conn (if (hgl? jmsUser)
             (.createQueueConnection
               cf
-              jmsUser
+              ^String jmsUser
               (stror (strit pwd) nil))
             (.createQueueConnection cf))
      s (.createQueueSession conn
                             false Session/CLIENT_ACKNOWLEDGE)
-     q (.lookup ctx destination)]
+     q (.lookup ctx ^String destination)]
     (if-not (ist? Queue q)
       (throwIOE "Object not of Queue type"))
     (-> (.createReceiver s ^Queue q)
@@ -171,8 +160,8 @@
   ""
   [pkey {:keys [jndiPwd jmsPwd] :as cfg}]
 
-  (-> (assoc cfg :jndiPwd (p-text (passwd<> jndiPwd pkey)))
-      (assoc :jmsPwd (p-text (passwd<> jmsPwd pkey)))))
+  (-> (assoc cfg :jndiPwd (p-text (pwd<> jndiPwd pkey)))
+      (assoc :jmsPwd (p-text (pwd<> jmsPwd pkey)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -215,9 +204,9 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(decl-mutable JMSPluglet
+(decl-mutable JmsPluglet
   Pluglet
-  (hold-event [_ t millis] (scheduleTrigger _ t millis))
+  (hold-event [_ _ _] (throwUOE "jms-pluglet:hold-event"))
   (get-server [me] (:parent @me))
   Idable
   (id [me] (:emAlias @me))
@@ -234,7 +223,7 @@
   (stop [me]
     (when-some [c (:$conn @me)]
       (try! (closeQ c))))
-  (dispose [_]))
+  (dispose [me] (.stop me)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -263,11 +252,10 @@
 (defn JMS ""
   ([_ id] (JMS _ id (JMSSpec)))
   ([_ id spec]
-   (mutable<> JMSPluglet
+   (mutable<> JmsPluglet
               {:pspec (update-in spec [:conf] expandVarsInForm)
-               :emAlias id
                :parent _
-               :timer (Timer. true)})))
+               :emAlias id })))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF

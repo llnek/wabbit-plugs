@@ -11,7 +11,7 @@
 
   czlab.wabbit.plugs.io.mails
 
-  (:require [czlab.twisty.codec :refer [passwd<>]]
+  (:require [czlab.twisty.codec :refer [pwd<>]]
             [czlab.basal.logging :as log])
 
   (:use [czlab.wabbit.plugs.io.loops]
@@ -61,14 +61,11 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- closeFolder "" [^Folder fd]
-  (if fd
-    (try!
-      (if (.isOpen fd) (.close fd true)))))
+  (if fd (try! (if (.isOpen fd) (.close fd true)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- closeStore "" [co]
-
   (let [{:keys [store folder]} @co]
     (closeFolder folder)
     (try! (some-> ^Store store .close))
@@ -79,44 +76,45 @@
 ;;
 (defn- resolveProvider
   ""
-  [co ^String cz ^String proto]
+  [co [^String cz ^String proto]]
 
   (let
     [mockp (sysProp "wabbit.mock.mail.proto")
      demo? (hgl? mockp)
      proto (if demo? mockp proto)
-     kee (keyword proto)
-     demop (kee *mock-mail-provider*)
+     demop (*mock-mail-provider* (keyword proto))
      ss (-> (doto (Properties.)
               (.put  "mail.store.protocol" proto))
             (Session/getInstance nil))
-     ps (.getProviders ss)
      [^Provider sun ^String pz]
      (if demo?
        [(Provider. Provider$Type/STORE
                    proto demop "czlab" "1.1.7") demop]
-       [(some #(if (= cz
-                      (.getClassName ^Provider %)) %)
-              (seq ps)) cz])]
+       [(some #(if (= cz (.getClassName ^Provider %)) %)
+              (.getProviders ss)) cz])]
     (if (nil? sun)
       (throwIOE (str "Failed to find store: " pz)))
     (log/info "mail store impl = %s" sun)
     (.setProvider ss sun)
-    (copy* co {:proto proto :session ss})))
+    (copy* co {:proto proto :pz pz :session ss})))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(decl-object MailMsg)
+(decl-object MailMsg
+             PlugletMsg
+             (get-pluglet [me] (:$source me)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- evt<> "" [co msg]
-  (object<> MainMsg
-            {:id (str "MailMsg." (seqint2)) :source co :message msg }))
+(defmacro ^:private evt<> "" [co msg]
+  `(object<> MainMsg
+             {:id (str "MailMsg." (seqint2))
+              :$source ~co
+              :message ~msg }))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- connectPop3 "" [^Config co]
+(defn- connectPop3 "" [co]
 
   (let [{:keys [^Session session
                 ^String proto]}
@@ -125,7 +123,7 @@
                 ^String user
                 port
                 passwd]}
-        (.config co)]
+        (:conf @co)]
     (when-some [s (.getStore session proto)]
       (.connect s
                 host
@@ -148,7 +146,7 @@
 (defn- readPop3 "" [co msgs]
 
   (let [d? (get-in @co [:conf :deleteMsg?])]
-    (doseq [^MimeMessage mm  msgs]
+    (doseq [^MimeMessage mm msgs]
       (doto mm
         (.getAllHeaders)
         (.getContent))
@@ -159,7 +157,7 @@
 ;;
 (defn- scanPop3 "" [co]
 
-  (let [{:keys [^Folder folder ^Store store]} co]
+  (let [{:keys [^Folder folder ^Store store]} @co]
     (if (and folder
              (not (.isOpen folder)))
       (.open folder Folder/READ_WRITE))
@@ -185,22 +183,22 @@
       (assoc :host (str host))
       (assoc :port (if (spos? port) port 995))
       (assoc :user (str user ))
-      (assoc :passwd (p-text (passwd<> passwd pkey)))))
+      (assoc :passwd (p-text (pwd<> passwd pkey)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (decl-mutable EmailPluglet
   Pluglet
-  (hold-event [_ t millis] (scheduleTrigger _ t millis))
+  (hold-event [_ _ _] (throwUOE "email-pluglet:hold-event"))
   (get-server [me] (:parent @me))
   Idable
   (id [me] (:emAlias @me))
   LifeCycle
   (init [me arg]
     (let [k (-> me get-server pkey-chars)
+          {:keys [sslvars vars]} @me
           c (get-in @me [:pspec :conf])
-          c2 (prevarCfg (merge c
-                               (sanitize k arg)))]
+          c2 (prevarCfg (sanitize k (merge c arg)))]
       (setf! me :conf c2)
       (resolveProvider me
                        (if (:ssl? c2) sslvars vars))))
@@ -210,7 +208,7 @@
          (scheduleThreadedLoop me ) (setf! me :loopy )))
   (stop [me]
     (stopThreadedLoop (:loopy @me)))
-  (dispose [_]))
+  (dispose [me] (.stop me)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -219,10 +217,11 @@
              {:pspec (update-in spec
                                 [:conf]
                                 expandVarsInForm)
-              :timer (Timer. true)
-              :waker wakerFunc
+              :sslvars sslvars
+              :vars vars
               :parent _
-              :emAlias id}))
+              :emAlias id
+              :waker wakerFunc }))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

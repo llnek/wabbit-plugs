@@ -32,10 +32,10 @@
 (defn- processOrphan ""
   ([evt] (processOrphan evt nil))
   ([evt ^Throwable e]
-   (let []
+   (let [plug (:source evt)]
      (some-> e log/exception )
      (log/error (str "event [%s] "
-                     "job#%s dropped") (gtid evt) (id?? evt)))))
+                     "%s dropped") (gtid evt) (id?? plug)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -48,13 +48,13 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- error!
-  "" [pglet evt e]
-  (if-some+
-    [r (strKW (get-in pglet
-                      [:pspec :eror]))]
-    (.callEx ^Cljrt
-             (-> pglet
-                 get-server cljrt) r (vargs* Object evt e))))
+  "" [evt e]
+  (let [plug (:source evt)]
+    (if-some+
+      [r (strKW (get-in @plug [:pspec :error]))]
+      (.callEx ^Cljrt
+               (-> plug
+                   get-server cljrt) r (vargs* Object evt e)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -62,27 +62,22 @@
   ([evt] (dispatch! evt nil))
   ([evt arg]
    (let
-     [plug (:source evt)
+     [pid (str "disp#" (seqint2))
+      plug (:source evt)
       cfg (:conf @plug)
-      c0 (:handler cfg)
-      c1 (:handler arg)
-      cb (or c1 c0)
-      _ (assert (ifn? cb))
-      ^Cljrt rts (-> plug
-                     get-server cljrt)
-      wf (or (try! (.callVar rts cb))
-             (error! src evt nil))]
-     (log/debug "[%s] event is disp!" (id?? plug))
-     (log/debug
-       (str "source = %s\n"
-            "arg = %s\n"
-            "cb = %s") (gtid plug) arg cb)
-     (try
-       (log/debug "#%s => %s" (id?? evt) (id?? plug))
-       (do->nil
-         (if (fn? wf)
-           (wf evt)
-           (processOrphan evt)))))))
+      ctr (get-server plug)
+      sc (get-scheduler ctr)
+      clj (cljrt ctr)
+      h (or (:handler arg)
+            (:handler cfg))
+      v (try (.callVar ^Cljrt clj h)
+             (catch Throwable _ (error! evt nil)))]
+     (do->nil
+       (log/debug "plug = %s\narg = %s\ncb = %s" (gtid plug) arg h)
+       (log/debug "#%s => %s :is disp!" (id?? evt) (id?? plug))
+       (if (fn? v)
+         (.run ^Schedulable sc (run-able+id<> pid (v evt)))
+         (processOrphan evt))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
