@@ -13,12 +13,11 @@
             [clojure.java.io :as io])
 
   (:use [czlab.test.wabbit.plugs.mock]
-        [czlab.wabbit.plugs.io.core]
-        [czlab.wabbit.ctl.core]
-        [czlab.convoy.nettio.client]
-        [czlab.convoy.net.core]
-        [czlab.wabbit.base.core]
-        [czlab.flux.wflow.core]
+        [czlab.wabbit.plugs.core]
+        [czlab.wabbit.xpis]
+        [czlab.nettio.client]
+        [czlab.convoy.core]
+        [czlab.wabbit.base]
         [czlab.basal.core]
         [czlab.basal.io]
         [czlab.basal.str]
@@ -27,17 +26,9 @@
   (:import [java.io DataOutputStream DataInputStream BufferedInputStream]
            [javax.mail Message Message$RecipientType Multipart]
            [javax.mail.internet MimeMessage]
-           [javax.jms TextMessage]
-           [czlab.convoy.nettio WholeResponse]
-           [czlab.flux.wflow Workstream Job]
            [io.netty.channel Channel]
-           [czlab.wabbit.sys Execvisor]
-           [czlab.wabbit.plugs.io
-            MailMsg
-            TcpMsg
-            FileMsg
-            JmsMsg
-            HttpMsg]
+           [czlab.jasal XData]
+           [javax.jms TextMessage]
            [java.net Socket]
            [java.io File]))
 
@@ -53,16 +44,17 @@
 ;;
 (defn fileHandler "" []
 
-  #(let [^FileMsg e (.origin ^Job %)
-         {:keys [targetFolder recvFolder]}
-         (.. e source config)
-         tp (fpath targetFolder)
-         rp (fpath recvFolder)
-         nm (jid<>)
-         f (.file e)
-         fp (fpath f)
-         s (slurpUtf8 f)
-         n (convLong s 0)]
+  #(let
+     [evt %1
+     {:keys [targetFolder recvFolder]}
+     (:conf @(get-pluglet evt))
+     tp (fpath targetFolder)
+     rp (fpath recvFolder)
+     nm (jid<>)
+     f (:file evt)
+     fp (fpath f)
+     s (slurpUtf8 f)
+     n (convLong s 0)]
      ;;the file should be in the recv-folder
      (when (>= (.indexOf fp rp) 0)
        ;; generate a new file in target-folder
@@ -74,9 +66,9 @@
 (defn sockHandler "" []
 
   #(let
-     [^TcpMsg ev (.origin ^Job %)
-      dis (DataInputStream. (.sockIn ev))
-      dos (DataOutputStream. (.sockOut ev))
+     [evt %1
+      dis (DataInputStream. (:sockin evt))
+      dos (DataOutputStream. (:sockout evt))
       nm (.readInt dis)]
      (swap! result-var + nm)
      (.writeInt dos (int nm))
@@ -86,8 +78,8 @@
 ;;
 (defn jmsHandler "" []
 
-  #(let [^JmsMsg ev (.origin ^Job %)
-         ^TextMessage msg (.message ev)
+  #(let [evt %1
+         ^TextMessage msg (:message evt)
          s (.getText msg)]
      (assert (hgl? s))
      (swap! result-var + 8)))
@@ -96,8 +88,8 @@
 ;;
 (defn mailHandler "" []
 
-  #(let [^MailMsg ev (.origin ^Job %)
-         ^MimeMessage msg (.message ev)
+  #(let [evt %1
+         ^MimeMessage msg (:message evt)
          _ (assert (some? msg))
          ^Multipart p (.getContent msg)]
      (assert (some? p))
@@ -107,14 +99,14 @@
 ;;
 (defn httpHandler "" []
 
-  (require 'czlab.convoy.nettio.resp)
-  #(let [^HttpMsg ev (.origin ^Job %)
-         cfg (.. ev source config)
-         soc (.socket ev)
-         res (httpResult<> ev)]
-     (.setContentType res "text/plain")
-     (.setContent res "hello")
-     (replyResult res)))
+  (require 'czlab.nettio.resp)
+  #(let [evt %1
+         res %2
+         cfg (:conf @(get-pluglet evt))
+         ch (:socket evt)]
+     (set-res-content-type res "text/plain")
+     (set-res-content res "hello")
+     (reply-result ch res)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -122,12 +114,12 @@
 
   (is (do->true (sysProp! "wabbit.user.dir" (fpath *tempfile-repo*))))
 
-  (is (let [etype :czlab.wabbit.plugs.io.http/HTTP
+  (is (let [etype :czlab.wabbit.plugs.http/HTTP
             ctr (mocker :exec)
             dir (sysProp "wabbit.user.dir")
             s (plugletViaType<> ctr etype "t")]
         (.init s
-               {:handler "czlab.test.wabbit.plugs.svcs/httpHandler"
+               {:handler #'czlab.test.wabbit.plugs.svcs/httpHandler
                 :host "localhost"
                 :port 8888})
         (.start s nil)
@@ -136,22 +128,20 @@
               _ (.mkdirs (.getParentFile f))
               _ (spit f "hello")
               res (h1get "http://localhost:8888/public/test.js")
-              ^WholeResponse
               rc (deref res 2000 nil)
-              z (some-> rc
-                        .content .strit)]
+              z (some-> ^XData (:body rc) .strit)]
           (.stop s)
           (.dispose s)
           (.dispose ctr)
           (= "hello" z))))
-(pause 11111)
+
   (is (let [_ (sysProp! "wabbit.mock.mail.proto" "imaps")
-            etype :czlab.wabbit.plugs.io.mails/IMAP
+            etype :czlab.wabbit.plugs.mails/IMAP
             ctr (mocker :exec)
             s (plugletViaType<> ctr etype "t")]
         (reset! result-var 0)
         (.init s
-               {:handler "czlab.test.wabbit.plugs.svcs/mailHandler"
+               {:handler #'czlab.test.wabbit.plugs.svcs/mailHandler
                 :host "localhost"
                 :port 7110
                 :intervalSecs 1
@@ -164,12 +154,12 @@
         (> @result-var 8)))
 
   (is (let [_ (sysProp! "wabbit.mock.mail.proto" "pop3s")
-            etype :czlab.wabbit.plugs.io.mails/POP3
+            etype :czlab.wabbit.plugs.mails/POP3
             ctr (mocker :exec)
             s (plugletViaType<> ctr etype "t")]
         (reset! result-var 0)
         (.init s
-               {:handler "czlab.test.wabbit.plugs.svcs/mailHandler"
+               {:handler #'czlab.test.wabbit.plugs.svcs/mailHandler
                 :host "localhost"
                 :port 7110
                 :intervalSecs 1
@@ -181,27 +171,25 @@
         (.dispose ctr)
         (> @result-var 8)))
 
-  (is (let [etype :czlab.wabbit.plugs.io.http/HTTP
+  (is (let [etype :czlab.wabbit.plugs.http/HTTP
             ctr (mocker :exec)
             s (plugletViaType<> ctr etype "t")]
         (.init s
-               {:handler "czlab.test.wabbit.plugs.svcs/httpHandler"
+               {:handler #'czlab.test.wabbit.plugs.svcs/httpHandler
                 :host "localhost"
                 :port 8888})
         (.start s nil)
         (pause 1000)
         (let [res (h1get "http://localhost:8888/test/get/xxx")
-              ^WholeResponse
               rc (deref res 2000 nil)
-              z (some-> rc
-                        .content .strit)]
+              z (some-> ^XData (:body rc) .strit)]
           (.stop s)
           (.dispose s)
           (.dispose ctr)
           (= "hello" z))))
 
   (is (let [_ (sysProp! "wabbit.mock.jms.loopsecs" "1")
-            etype :czlab.wabbit.plugs.io.jms/JMS
+            etype :czlab.wabbit.plugs.jms/JMS
             c {:contextFactory "czlab.proto.mock.jms.MockContextFactory"
                :providerUrl "java://aaa"
                ;;:connFactory "tcf"
@@ -212,7 +200,7 @@
                :jndiPwd "root"
                :jmsUser "anonymous"
                :jmsPwd "anonymous"
-               :handler "czlab.test.wabbit.plugs.svcs/jmsHandler"}
+               :handler #'czlab.test.wabbit.plugs.svcs/jmsHandler}
             ctr (mocker :exec)
             s (plugletViaType<> ctr etype "t")]
         (reset! result-var 0)
@@ -224,7 +212,7 @@
         (> @result-var 8)))
 
   (is (let [_ (sysProp! "wabbit.mock.jms.loopsecs" "1")
-            etype :czlab.wabbit.plugs.io.jms/JMS
+            etype :czlab.wabbit.plugs.jms/JMS
             c {:contextFactory "czlab.proto.mock.jms.MockContextFactory"
                :providerUrl "java://aaa"
                ;;:connFactory "tcf"
@@ -235,7 +223,7 @@
                :jndiPwd "root"
                :jmsUser "anonymous"
                :jmsPwd "anonymous"
-               :handler "czlab.test.wabbit.plugs.svcs/jmsHandler"}
+               :handler #'czlab.test.wabbit.plugs.svcs/jmsHandler}
             ctr (mocker :exec)
             s (plugletViaType<> ctr etype "t")]
         (reset! result-var 0)
@@ -246,12 +234,12 @@
         (.dispose ctr)
         (> @result-var 8)))
 
-  (is (let [etype :czlab.wabbit.plugs.io.socket/SocketIO
+  (is (let [etype :czlab.wabbit.plugs.socket/SocketIO
             host "localhost"
             port 5555
             c {:host host
                :port port
-               :handler "czlab.test.wabbit.plugs.svcs/sockHandler"}
+               :handler #'czlab.test.wabbit.plugs.svcs/sockHandler}
             ctr (mocker :exec)
             s (plugletViaType<> ctr etype "t")]
         (.init s c)
@@ -272,9 +260,9 @@
         (.dispose ctr)
         (== @result-var 32)))
 
-  (is (let [etype :czlab.wabbit.plugs.io.loops/OnceTimer
+  (is (let [etype :czlab.wabbit.plugs.loops/OnceTimer
             c {:delaySecs 1
-               :handler "czlab.test.wabbit.plugs.svcs/testHandler"}
+               :handler #'czlab.test.wabbit.plugs.svcs/testHandler}
             ctr (mocker :exec)
             s (plugletViaType<> ctr etype "t")]
         (reset! result-var 0)
@@ -285,10 +273,10 @@
         (.dispose ctr)
         (== 8 @result-var)))
 
-  (is (let [etype :czlab.wabbit.plugs.io.loops/RepeatingTimer
+  (is (let [etype :czlab.wabbit.plugs.loops/RepeatingTimer
             c {:delaySecs 1
                :intervalSecs 1
-               :handler "czlab.test.wabbit.plugs.svcs/testHandler"}
+               :handler #'czlab.test.wabbit.plugs.svcs/testHandler}
             ctr (mocker :exec)
             s (plugletViaType<> ctr etype "t")]
         (reset! result-var 0)
@@ -299,7 +287,7 @@
         (.dispose ctr)
         (> @result-var 8)))
 
-  (is (let [etype :czlab.wabbit.plugs.io.files/FilePicker
+  (is (let [etype :czlab.wabbit.plugs.files/FilePicker
             root *tempfile-repo*
             from (str root "/from")
             to (str root "/to")
@@ -309,7 +297,7 @@
                :fmask ""
                :intervalSecs 1
                :delaySecs 0
-               :handler "czlab.test.wabbit.plugs.svcs/fileHandler"}
+               :handler #'czlab.test.wabbit.plugs.svcs/fileHandler}
             ctr (mocker :exec)
             s (plugletViaType<> ctr etype "t")]
         (.init s c)

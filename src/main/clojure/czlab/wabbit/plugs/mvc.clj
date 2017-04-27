@@ -9,21 +9,22 @@
 (ns ^{:doc ""
       :author "Kenneth Leung"}
 
-  czlab.wabbit.plugs.io.mvc
+  czlab.wabbit.plugs.mvc
 
   (:require [clojure.walk :refer [postwalk]]
             [czlab.basal.logging :as log]
             [clojure.string :as cs]
             [clojure.java.io :as io])
 
-  (:use [czlab.convoy.nettio.resp]
+  (:use [czlab.nettio.resp]
         [czlab.wabbit.base]
         [czlab.convoy.core]
         [czlab.convoy.wess]
         [czlab.basal.core]
         [czlab.basal.io]
         [czlab.basal.str]
-        [czlab.wabbit.plugs.io.core])
+        [czlab.wabbit.xpis]
+        [czlab.wabbit.plugs.core])
 
   (:import [clojure.lang APersistentMap]
            [freemarker.template
@@ -212,12 +213,15 @@
     (try
       (if (or (nil? fp)
               (not (.exists fp)))
-        (-> (assoc res :status 404) reply-result)
-        (-> (assoc res :body fp) reply-result ))
+        (->> (assoc res :status 404) (reply-result ch))
+        (->> (assoc res :body fp) (reply-result ch)))
       (catch Throwable e#
         (log/error e# "get: %s" (:uri evt))
         (try!
-          (-> (assoc res :body nil :status 500) reply-result ))))))
+          (->> (assoc res
+                      :body nil
+                      :status 500)
+               (reply-result ch)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -228,8 +232,7 @@
      (:conf @co)
      homeDir (fpath (-> co get-server get-home-dir))
      r (:route evt)
-     mp (str (some-> ^RouteInfo
-                     (:info r) :mountPoint))
+     mp (str (some-> (:info r) :mountPoint))
      ;;need to do this for testing only since expandvars
      ;;not called
      publicRootDir (expandVars publicRootDir)
@@ -247,7 +250,9 @@
       (getStatic res ffile)
       (let [ch (:socket evt)]
         (log/warn "illegal uri access: %s" fp)
-        (-> (assoc res :status 403) reply-result )))))
+        (->> (assoc res
+                    :status 403)
+             (reply-result (:socket evt)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

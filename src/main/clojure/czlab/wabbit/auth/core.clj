@@ -9,23 +9,25 @@
 (ns ^{:doc ""
       :author "Kenneth Leung"}
 
-  czlab.wabbit.plugs.auth.core
+  czlab.wabbit.auth.core
 
   ;;(:gen-class)
 
   (:require [czlab.basal.format :refer [readEdn readJsonStr writeJsonStr]]
-            [czlab.convoy.util :refer [generateCsrf filterFormFields]]
-            [czlab.wabbit.plugs.io.http :refer [scanBasicAuth]]
-            [czlab.horde.connect :refer [dbapi<>]]
+            [czlab.convoy.util :refer [generateCsrf]]
+            [czlab.wabbit.plugs.http :refer [scanBasicAuth]]
             [czlab.basal.resources :refer [rstr]]
-            [czlab.convoy.wess :as wss]
+            [czlab.convoy.wess :as wss :refer :all]
             [clojure.string :as cs]
             [clojure.java.io :as io]
             [czlab.basal.logging :as log])
 
-  (:use [czlab.wabbit.plugs.auth.model]
+  (:use [czlab.wabbit.auth.model]
         [czlab.twisty.codec]
+        [czlab.horde.connect]
+        [czlab.wabbit.xpis]
         [czlab.wabbit.base]
+        [czlab.convoy.upload]
         [czlab.convoy.core]
         [czlab.basal.core]
         [czlab.basal.io]
@@ -36,7 +38,15 @@
   (:import [org.apache.shiro.authc.credential CredentialsMatcher]
            [org.apache.shiro.config IniSecurityManagerFactory]
            [org.apache.shiro.authc UsernamePasswordToken]
-           [czlab.jasal XData I18N DataError]
+           [java.security GeneralSecurityException]
+           [org.apache.commons.fileupload FileItem]
+           [czlab.jasal
+            LifeCycle
+            Idable
+            XData
+            I18N
+            DataError
+            Hierarchical]
            [org.apache.shiro.realm AuthorizingRealm]
            [org.apache.shiro.subject Subject]
            [java.util Base64 Base64$Decoder]
@@ -84,7 +94,7 @@
 (defprotocol AuthPluglet
   ""
   (check-action [_ acctObj action] "")
-  (login [_ user pwd] "")
+  (do-login [_ user pwd] "")
   (add-account [_ options] "")
   (has-account? [_ options] "")
   (get-roles [_ acctObj] "")
@@ -94,9 +104,9 @@
 ;;
 (defn newSession<> "" [evt attrs]
   (let
-    [plug (:source evt)
-     s (wss/wsession<> (-> plug get-server pkey-bytes)
-                       (:session (:conf @plug)))]
+    [plug (get-pluglet evt)
+     s (wsession<> (-> plug get-server pkey-bytes)
+                   (:session (:conf @plug)))]
     (doseq [[k v] attrs] (set-session-attr s k v))
     s))
 
@@ -108,7 +118,7 @@
   [{:keys [domainPath domain]} token]
 
   (let [ok? (hgl? token)
-        c (HttpCookie. wss/csrf-cookie
+        c (HttpCookie. wss/*csrf-cookie*
                        (if ok? token "*"))]
     (if (hgl? domainPath) (.setPath c domainPath))
     (if (hgl? domain) (.setDomain c domain))
@@ -193,8 +203,8 @@
   (if (:nonce info)
     (try!
       (let
-        [decr (->> (get info fld)
-                   (caesarDecrypt shiftCount))
+        [^String decr (->> (get info fld)
+                           (decrypt (caesar<>) shiftCount))
          s (->> decr
                 (.decode (Base64/getMimeDecoder))
                 strit)]
@@ -238,7 +248,7 @@
   [pool]
   {:pre [(some? pool)]}
 
-  (let [tbl (->> :czlab.wabbit.plugs.auth.model/LoginAccount
+  (let [tbl (->> :czlab.wabbit.auth.model/LoginAccount
                  (get (:models *auth-meta-cache*))
                  dbtable)]
     (when-not (tableExist? pool tbl)
@@ -249,8 +259,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- getSQLr
-  "" {:tag SQLr}
+(defn- getSQLr ""
   ([ctr] (getSQLr ctr false))
   ([ctr tx?]
    {:pre [(some? ctr)]}
@@ -268,7 +277,7 @@
   [sql role desc]
   {:pre [(some? sql)]}
   (let [m (get (:models sql)
-               :czlab.wabbit.plugs.auth.model/AuthRole)
+               :czlab.wabbit.auth.model/AuthRole)
         rc (-> (dbpojo<> m)
                (dbSetFlds* {:name role
                             :desc desc}))]
@@ -281,7 +290,7 @@
   [sql role]
   {:pre [(some? sql)]}
   (let [m (get (:models sql)
-               :czlab.wabbit.plugs.auth.model/AuthRole)]
+               :czlab.wabbit.auth.model/AuthRole)]
     (exec-sql sql
               (format
                 "delete from %s where %s =?"
@@ -294,7 +303,7 @@
   "List all the roles in db"
   [sql]
   {:pre [(some? sql)]}
-  (find-all sql :czlab.wabbit.plugs.auth.model/AuthRole))
+  (find-all sql :czlab.wabbit.auth.model/AuthRole))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -315,7 +324,7 @@
    {:pre [(some? sql)(hgl? user)]}
 
    (let [m (get (:models sql)
-                :czlab.wabbit.plugs.auth.model/LoginAccount)
+                :czlab.wabbit.auth.model/LoginAccount)
          ps (some-> pwdObj hashed)
          acc
          (->>
@@ -327,7 +336,7 @@
      ;; previous insert. That is, if we fail to set a role, it's
      ;; assumed ok for the account to remain inserted
      (doseq [r roleObjs]
-       (dbSetM2M {:joined :czlab.wabbit.plugs.auth.model/AccountRoles
+       (dbSetM2M {:joined :czlab.wabbit.auth.model/AccountRoles
                   :with sql} acc r))
      (log/debug "created new account %s%s%s%s"
                 "into db: " acc "\nwith meta\n" (meta acc))
@@ -343,7 +352,7 @@
   {:pre [(some? sql)]}
 
   (find-one sql
-            :czlab.wabbit.plugs.auth.model/LoginAccount
+            :czlab.wabbit.auth.model/LoginAccount
             {:email (strim email) }))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -356,7 +365,7 @@
   {:pre [(some? sql)]}
 
   (find-one sql
-            :czlab.wabbit.plugs.auth.model/LoginAccount
+            :czlab.wabbit.auth.model/LoginAccount
             {:acctid (strim user) }))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -426,7 +435,7 @@
   {:pre [(some? sql)]}
 
   (dbClrM2M
-    {:joined :czlab.wabbit.plugs.auth.model/AccountRoles :with sql} user role))
+    {:joined :czlab.wabbit.auth.model/AccountRoles :with sql} user role))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -438,7 +447,7 @@
   {:pre [(some? sql)]}
 
   (dbSetM2M
-    {:joined :czlab.wabbit.plugs.auth.model/AccountRoles :with sql} user role))
+    {:joined :czlab.wabbit.auth.model/AccountRoles :with sql} user role))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -458,7 +467,7 @@
   {:pre [(some? sql)]}
 
   (let [m (get (:models sql)
-               :czlab.wabbit.plugs.auth.model/LoginAccount)]
+               :czlab.wabbit.auth.model/LoginAccount)]
     (exec-sql sql
               (format
                 "delete from %s where %s =?"
@@ -473,7 +482,7 @@
   [sql]
   {:pre [(some? sql)]}
 
-  (find-all sql :czlab.wabbit.plugs.auth.model/LoginAccount))
+  (find-all sql :czlab.wabbit.auth.model/LoginAccount))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -484,7 +493,7 @@
   (let [f (io/file homeDir "etc/shiro.ini")
         f (if-not (fileRead? f)
             (doto (io/file *tempfile-repo* (jid<>))
-              (spit (resStr "czlab/wabbit/plugs/auth/shiro.ini")))
+              (spit (resStr "czlab/wabbit/auth/shiro.ini")))
             f)]
     (-> (io/as-url f)
         str
@@ -501,13 +510,14 @@
   [^String challengeStr evt]
 
   (let
-    [ck (get (:cookies evt) wss/csrf-cookie)
+    [^HttpCookie
+     ck (get (:cookies evt) wss/*csrf-cookie*)
      csrf (some-> ck .getValue)
      info (try
             (getSignupInfo evt)
-            (catch BadDataError _ {:e _}))
+            (catch DataError _ {:e _}))
      rb (I18N/base)
-     pa (-> (:source evt)
+     pa (-> (get-pluglet evt)
             (get-server )
             (get-child :$auth))]
     (log/debug "csrf = %s%s%s"
@@ -538,13 +548,14 @@
 ;;
 (defn loginTestExpr<> "" [evt]
   (let
-    [ck (get (:cookies evt) wss/csrf-cookie)
+    [^HttpCookie
+     ck (get (:cookies evt) wss/*csrf-cookie*)
      csrf (some-> ck .getValue)
      info (try
             (getSignupInfo evt)
             (catch DataError _ {:e _}))
      rb (I18N/base)
-     pa (-> (:source evt)
+     pa (-> (get-pluglet evt)
             (get-server )
             (get-child :$auth))]
     (log/debug "csrf = %s%s%s"
@@ -570,21 +581,20 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (decl-mutable AuthPlugletObj
-  Pluglet
-  (get-server [me] (:parent @me))
-  (hold-event [_ _ _])
+  Hierarchical
+  (parent [me] (:parent @me))
   Idable
   (id [me] (:emAlias @me))
   LifeCycle
   (init [me arg]
-    (-> (get-server me)
+    (-> (.parent me)
         dft-db-pool assertPluginOK)
     (->> (merge (get-in @me
                         [:pspec :conf]) arg)
          (prevarCfg)
          (setf! me :conf))
-    (initShiro (get-home-dir (get-server me))
-               (pkey-chars (get-server me))))
+    (initShiro (get-home-dir (.parent me))
+               (pkey-chars (.parent me))))
   (start [me] (.start me nil))
   (start [me _]
     (log/info "AuthPluglet started"))
@@ -596,7 +606,7 @@
   (check-action [_ acctObj action] )
   (add-account [me arg]
     (let [{:keys [principal credential]} arg
-          par (get-server me)
+          par (.parent me)
           pkey (pkey-chars par)]
       (createLoginAccount
         (getSQLr par)
@@ -606,7 +616,7 @@
   (do-login [me u p]
     (binding
       [*meta-cache* *auth-meta-cache*
-       *jdbc-pool* (dft-db-pool (get-server me))]
+       *jdbc-pool* (dft-db-pool (.parent me))]
       (let
         [cur (SecurityUtils/getSubject)
          sss (.getSession cur)]
@@ -620,14 +630,14 @@
             (log/debug "User [%s] logged in successfully" u)))
         (if (.isAuthenticated cur)
           (.getPrincipal cur)))))
-  (has-account [me arg]
-    (let [par (get-server me)
+  (has-account? [me arg]
+    (let [par (.parent me)
           pkey (pkey-chars par)]
       (hasLoginAccount? (getSQLr par)
                         (:principal arg))))
   (get-account [me arg]
     (let [{:keys [principal email]} arg
-          par (get-server me)
+          par (.parent me)
           pkey (pkey-chars par)
           sql (getSQLr par)]
       (cond
@@ -658,7 +668,7 @@
           acc (-> (.getPrincipals inf)
                   .getPrimaryPrincipal)]
       (and (= (:acctid acc) uid)
-           (.validateHash tstPwd pc)))))
+           (valid-hash? tstPwd pc)))))
 
 (ns-unmap *ns* '->PwdMatcher)
 

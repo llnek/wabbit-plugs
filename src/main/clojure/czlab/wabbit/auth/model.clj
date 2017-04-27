@@ -9,7 +9,7 @@
 (ns ^{:doc ""
       :author "Kenneth Leung"}
 
-  czlab.wabbit.plugs.auth.model
+  czlab.wabbit.auth.model
 
   (:require [czlab.basal.resources :refer [rstr]]
             [czlab.basal.io :refer [spitUtf8]]
@@ -17,6 +17,7 @@
             [czlab.basal.logging :as log])
 
   (:use [czlab.horde.drivers]
+        [czlab.basal.core]
         [czlab.horde.core])
 
   (:import [java.sql Connection]
@@ -85,7 +86,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defmethod applyDDL
-  JdbcSpec
+  czlab.horde.core.JdbcSpec
   [spec]
   (when-some [t (matchUrl (:url spec))]
     (with-open [c (dbconnect<> spec)]
@@ -94,9 +95,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defmethod applyDDL
-  JdbcPool
+  czlab.horde.core.JdbcPool
   [pool]
-  (when-some [t (matchUrl (:dbUrl pool))]
+  (when-some [t (matchUrl (:url (:jdbc pool)))]
     (uploadDdl pool (genAuthPlugletDDL t))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

@@ -9,20 +9,21 @@
 (ns ^{:doc "Implementation for email services."
       :author "Kenneth Leung"}
 
-  czlab.wabbit.plugs.io.mails
+  czlab.wabbit.plugs.mails
 
-  (:require [czlab.twisty.codec :refer [pwd<>]]
-            [czlab.basal.logging :as log])
+  (:require [czlab.basal.logging :as log])
 
-  (:use [czlab.wabbit.plugs.io.loops]
-        [czlab.wabbit.plugs.io.core]
+  (:use [czlab.wabbit.plugs.loops]
+        [czlab.wabbit.plugs.core]
+        [czlab.twisty.codec]
         [czlab.wabbit.base]
+        [czlab.wabbit.xpis]
         [czlab.basal.core]
         [czlab.basal.str])
 
-  (:import [javax.mail.internet MimeMessage]
+  (:import [czlab.jasal Hierarchical LifeCycle Idable]
+           [javax.mail.internet MimeMessage]
            [clojure.lang APersistentMap]
-           [czlab.jasal LifeCycle Idable]
            [javax.mail
             Flags$Flag
             Flags
@@ -69,8 +70,8 @@
   (let [{:keys [store folder]} @co]
     (closeFolder folder)
     (try! (some-> ^Store store .close))
-    (unsetf! co dissoc :store)
-    (unsetf! co dissoc :folder)))
+    (unsetf! co :store)
+    (unsetf! co :folder)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -107,7 +108,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defmacro ^:private evt<> "" [co msg]
-  `(object<> MainMsg
+  `(object<> MailMsg
              {:id (str "MailMsg." (seqint2))
               :$source ~co
               :message ~msg }))
@@ -188,9 +189,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (decl-mutable EmailPluglet
-  Pluglet
-  (hold-event [_ _ _] (throwUOE "email-pluglet:hold-event"))
-  (get-server [me] (:parent @me))
+  Hierarchical
+  (parent [me] (:parent @me))
   Idable
   (id [me] (:emAlias @me))
   LifeCycle

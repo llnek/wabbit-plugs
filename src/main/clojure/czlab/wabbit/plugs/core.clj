@@ -9,7 +9,7 @@
 (ns ^{:doc "Core functions for all IO services."
       :author "Kenneth Leung"}
 
-  czlab.wabbit.plugs.io.core
+  czlab.wabbit.plugs.core
 
   (:require [czlab.basal.meta :refer [getCldr]]
             [czlab.basal.logging :as log])
@@ -20,8 +20,8 @@
         [czlab.basal.meta]
         [czlab.basal.str])
 
-  (:import [czlab.basal Cljrt]
-           [czlab.jasal Triggerable]
+  (:import [czlab.jasal Schedulable]
+           [czlab.basal Cljrt]
            [java.util Timer TimerTask]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -32,7 +32,7 @@
 (defn- processOrphan ""
   ([evt] (processOrphan evt nil))
   ([evt ^Throwable e]
-   (let [plug (:source evt)]
+   (let [plug (get-pluglet evt)]
      (some-> e log/exception )
      (log/error (str "event [%s] "
                      "%s dropped") (gtid evt) (id?? plug)))))
@@ -60,14 +60,15 @@
 ;;
 (defn dispatch! ""
   ([evt] (dispatch! evt nil))
-  ([evt arg]
+  ([evt & arg]
    (let
      [pid (str "disp#" (seqint2))
-      plug (:source evt)
+      plug (get-pluglet evt)
       cfg (:conf @plug)
       ctr (get-server plug)
       sc (get-scheduler ctr)
       clj (cljrt ctr)
+      dsp (:dispfn arg)
       h (or (:handler arg)
             (:handler cfg))
       v (try (.callVar ^Cljrt clj h)
@@ -76,7 +77,10 @@
        (log/debug "plug = %s\narg = %s\ncb = %s" (gtid plug) arg h)
        (log/debug "#%s => %s :is disp!" (id?? evt) (id?? plug))
        (if (fn? v)
-         (.run ^Schedulable sc (run-able+id<> pid (v evt)))
+         (->> (if (fn? dsp)
+                (run-able+id<> pid (dsp v evt))
+                (run-able+id<> pid (v evt)))
+              (.run ^Schedulable sc ))
          (processOrphan evt))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

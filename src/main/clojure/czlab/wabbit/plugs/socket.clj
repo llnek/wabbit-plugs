@@ -9,21 +9,27 @@
 (ns ^{:doc "Implementation for TCP socket service."
       :author "Kenneth Leung"}
 
-  czlab.wabbit.plugs.io.socket
+  czlab.wabbit.plugs.socket
 
   (:require [czlab.basal.process :refer [async!]]
             [czlab.basal.meta :refer [getCldr]]
             [czlab.basal.io :refer [closeQ]]
             [czlab.basal.logging :as log])
 
-  (:use [czlab.wabbit.plugs.io.core]
+  (:use [czlab.wabbit.plugs.core]
+        [czlab.wabbit.xpis]
         [czlab.basal.core]
         [czlab.basal.str]
         [czlab.wabbit.base])
 
   (:import [java.net InetAddress ServerSocket Socket]
-           [czlab.jasal LifeCycle Idable]
-           [clojure.lang APersistentMap]))
+           [clojure.lang APersistentMap]
+           [czlab.jasal
+            Disposable
+            LifeCycle
+            Idable
+            Hierarchical]))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;(set! *warn-on-reflection* true)
@@ -90,9 +96,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (decl-mutable SocketPluglet
-  Pluglet
-  (hold-event [_ _ _] (throwUOE "socket-pluglet:hold-event"))
-  (get-server [me] (:parent @me))
+  Hierarchical
+  (parent [me] (:parent @me))
   Idable
   (id [me] (:emAlias @me))
   LifeCycle

@@ -9,18 +9,20 @@
 (ns ^{:doc "Implementation for JMS service."
       :author "Kenneth Leung" }
 
-  czlab.wabbit.plugs.io.jms
+  czlab.wabbit.plugs.jms
 
-  (:require [czlab.twisty.codec :refer [pwd<>]]
-            [czlab.basal.logging :as log])
+  (:require [czlab.basal.logging :as log])
 
-  (:use [czlab.wabbit.base]
+  (:use [czlab.twisty.codec]
+        [czlab.wabbit.base]
+        [czlab.wabbit.xpis]
         [czlab.basal.core]
+        [czlab.basal.io]
         [czlab.basal.str]
-        [czlab.wabbit.plugs.io.core])
+        [czlab.wabbit.plugs.core])
 
   (:import [java.util Hashtable Properties ResourceBundle]
-           [czlab.jasal LifeCycle Idable]
+           [czlab.jasal Hierarchical LifeCycle Idable]
            [javax.jms
             ConnectionFactory
             Connection
@@ -92,7 +94,7 @@
           (.createConsumer c)
           (.setMessageListener
             (reify MessageListener
-              (onMessage [_ m] (onMsg pg m)))))
+              (onMessage [_ m] (onMsg co m)))))
       (throwIOE "Object not of Destination type"))
     conn))
 
@@ -123,7 +125,7 @@
           (.createSubscriber s t))
         (.setMessageListener
           (reify MessageListener
-            (onMessage [_ m] (onMsg pg m)))))
+            (onMessage [_ m] (onMsg co m)))))
     conn))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -151,7 +153,7 @@
     (-> (.createReceiver s ^Queue q)
         (.setMessageListener
           (reify MessageListener
-            (onMessage [_ m] (onMsg pg m)))))
+            (onMessage [_ m] (onMsg co m)))))
     conn))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -205,9 +207,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (decl-mutable JmsPluglet
-  Pluglet
-  (hold-event [_ _ _] (throwUOE "jms-pluglet:hold-event"))
-  (get-server [me] (:parent @me))
+  Hierarchical
+  (parent [me] (:parent @me))
   Idable
   (id [me] (:emAlias @me))
   LifeCycle

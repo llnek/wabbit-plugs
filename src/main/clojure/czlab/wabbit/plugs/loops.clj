@@ -9,7 +9,7 @@
 (ns ^{:doc "Basic functions for loopable services."
       :author "Kenneth Leung"}
 
-  czlab.wabbit.plugs.io.loops
+  czlab.wabbit.plugs.loops
 
   (:require [czlab.basal.dates :refer [parseDate]]
             [czlab.basal.process :refer [async!]]
@@ -17,12 +17,13 @@
             [czlab.basal.logging :as log])
 
   (:use [czlab.wabbit.base]
+        [czlab.wabbit.xpis]
         [czlab.basal.core]
         [czlab.basal.str]
-        [czlab.wabbit.plugs.io.core])
+        [czlab.wabbit.plugs.core])
 
-  (:import [java.util Date Timer TimerTask]
-           [czlab.jasal LifeCycle Idable]
+  (:import [czlab.jasal Hierarchical LifeCycle Idable]
+           [java.util Date Timer TimerTask]
            [clojure.lang APersistentMap]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -36,12 +37,12 @@
 
   (log/info "Scheduling a *repeating* timer: %dms" intv)
   (if (spos? intv)
-    (let [tt (tmtask<> func)]
+    (do-with [tt (tmtask<> func)]
       (if (ist? Date dw)
         (.schedule timer tt ^Date dw intv)
         (.schedule timer
                    tt
-                   ^long (if (spos? ds) ds 1000) intv)) tt)))
+                   (long (if (spos? ds) ds 1000)) intv)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -50,12 +51,12 @@
   [^Timer timer [dw ds] func]
 
   (log/info "Scheduling a *one-shot* timer at %s" [dw ds])
-  (let [tt (tmtask<> func)]
+  (do-with [tt (tmtask<> func)]
     (if (ist? Date dw)
       (.schedule timer tt ^Date dw)
       (.schedule timer
                  tt
-                 ^long (if (spos? ds) ds 1000))) tt))
+                 (long (if (spos? ds) ds 1000))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -82,7 +83,7 @@
         w #(async!
              (fn [_]
                (while @loopy
-                 (waker me) (pause ms))))]
+                 (waker plug) (pause ms))))]
     (cfgTimer (Timer. true) w cfg false)
     loopy))
 
@@ -107,9 +108,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (decl-mutable TimerPluglet
-  Pluglet
-  (hold-event [_ _ _] (throwUOE "timer-pluglet:hold-event"))
-  (get-server [me] (:parent @me))
+  Hierarchical
+  (parent [me] (:parent @me))
   Idable
   (id [me] (:emAlias @me))
   LifeCycle

@@ -9,22 +9,23 @@
 (ns ^{:doc "Implementation for FilePicker."
       :author "Kenneth Leung"}
 
-  czlab.wabbit.plugs.io.files
+  czlab.wabbit.plugs.files
 
   (:require [czlab.basal.io :refer [mkdirs]]
             [czlab.basal.logging :as log]
             [clojure.java.io :as io])
 
-  (:use [czlab.wabbit.plugs.io.loops]
-        [czlab.wabbit.plugs.io.core]
+  (:use [czlab.wabbit.plugs.loops]
+        [czlab.wabbit.plugs.core]
         [czlab.wabbit.base]
+        [czlab.wabbit.xpis]
         [czlab.basal.core]
         [czlab.basal.str])
 
-  (:import [java.io FileFilter File IOException]
-           [java.util Properties ResourceBundle]
+  (:import [czlab.jasal Hierarchical LifeCycle Idable]
+           [java.util Timer Properties ResourceBundle]
+           [java.io FileFilter File IOException]
            [clojure.lang APersistentMap]
-           [czlab.jasal LifeCycle Idable]
            [org.apache.commons.io.filefilter
             SuffixFileFilter
             PrefixFileFilter
@@ -136,9 +137,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (decl-mutable FilePickerPluglet
-  Pluglet
-  (hold-event [_ _ _] (throwUOE "file-picker:hold-event"))
-  (get-server [me] (:parent @me))
+  Hierarchical
+  (parent [me] (:parent @me))
   Idable
   (id [me] (:emAlias @me))
   LifeCycle
@@ -151,7 +151,7 @@
   (start [me arg]
     (let [w #(doto->> (fileMon<> me) (setf! me :mon) .start)]
       (log/info "apache io monitor starting...")
-      (->> (configTimer (Timer. true) w (:conf @me) false)
+      (->> (cfgTimer (Timer. true) w (:conf @me) false)
            (setf! me :ttask))))
   (dispose [me]
            (.stop me))

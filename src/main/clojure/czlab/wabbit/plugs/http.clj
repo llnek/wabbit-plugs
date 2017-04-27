@@ -9,32 +9,35 @@
 (ns ^{:doc "Implementation for HTTP/MVC service."
       :author "Kenneth Leung"}
 
-  czlab.wabbit.plugs.io.http
+  czlab.wabbit.plugs.http
 
   (:require [czlab.convoy.util :refer [parseBasicAuth]]
             [czlab.basal.format :refer [readEdn]]
-            [czlab.twisty.codec :refer [pwd<>]]
             [czlab.basal.logging :as log]
-            [czlab.wabbit.plugs.io.mvc :as mvc]
+            [czlab.wabbit.plugs.mvc :as mvc]
             [clojure.java.io :as io]
             [clojure.string :as cs])
 
-  (:use [czlab.wabbit.plugs.io.core]
+  (:use [czlab.wabbit.plugs.core]
         [czlab.nettio.discarder]
+        [czlab.convoy.routes]
+        [czlab.nettio.server]
+        [czlab.twisty.codec]
         [czlab.nettio.core]
         [czlab.wabbit.base]
+        [czlab.wabbit.xpis]
         [czlab.convoy.core]
         [czlab.convoy.wess]
-        [czlab.convoy.server]
-        [czlab.convoy.routes]
         [czlab.twisty.ssl]
         [czlab.basal.core]
         [czlab.basal.io]
         [czlab.basal.str]
         [czlab.basal.meta])
 
-  (:import [java.nio.channels ClosedChannelException]
+  (:import [czlab.nettio.core NettyWsockMsg NettyHttpMsg]
+           [java.nio.channels ClosedChannelException]
            [io.netty.handler.codec DecoderException]
+           [clojure.lang IDeref Atom APersistentMap]
            [io.netty.handler.codec.http.websocketx
             TextWebSocketFrame
             WebSocketFrame
@@ -45,10 +48,10 @@
            [io.netty.bootstrap ServerBootstrap]
            [io.netty.buffer ByteBuf Unpooled]
            [io.netty.handler.ssl SslHandler]
-           [clojure.lang Atom APersistentMap]
            [czlab.nettio InboundHandler]
            [czlab.jasal
             LifeCycle
+            Startable
             Idable
             Hierarchical]
            [czlab.basal Cljrt]
@@ -101,6 +104,14 @@
 (def ^:private ^String auth-token "authorization")
 (def ^:private ^String basic-token "basic")
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+(extend-protocol PlugletMsg
+  NettyWsockMsg
+  (get-pluglet [me] (:$source me))
+  NettyHttpMsg
+  (get-pluglet [me] (:$source me)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn scanBasicAuth
@@ -143,9 +154,7 @@
      {:keys [route cookies]} req]
     (merge req
            {:session (if (and (!false? wantSession?)
-                              (some-> ^IDeref
-                                      (:info route)
-                                      .deref :wantSession?))
+                              (:wantSession? (:info route)))
                        (upstream (-> co get-server pkey-bytes)
                                  cookies
                                  (if session (:macit? @session))))
@@ -156,18 +165,26 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- evt<>
-  "" [co {:keys [ch msg]}]
+  "" [co ch msg]
   (cond
     (satisfies? WsockMsgGist msg)
     (wsockEvent<> co ch msg)
     (satisfies? HttpMsgGist msg)
     (httpEvent<> co ch msg)))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+(defn- funky "" [evt]
+  (if
+    (satisfies? HttpMsgGist evt)
+    (let [res (http-result (:socket evt) evt nil)]
+      (fn [h e] (h e res)))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- boot! "" ^LifeCycle [co]
   (let
-    [asset! #'czlab.wabbit.plugs.io.mvc/asset!
+    [asset! #'czlab.wabbit.plugs.mvc/asset!
      {:keys [waitMillis] :as cfg}
      (:conf @co)
      w (nettyWebServer<>)]
@@ -176,16 +193,15 @@
          {:h1
           (proxy [InboundHandler][]
             (channelRead0 [ctx msg]
-              (let [ev (evt<> co msg)
+              (let [ev (evt<> co (ch?? ctx) msg)
                     {:keys [static? handler]}
-                    (some-> ^IDeref
-                            (get-in msg
-                                    [:route :info]) .deref)
+                    (get-in msg [:route :info])
                     hd (if (and static?
                                 (nil? handler)) asset! handler)]
-               (if (spos? waitMillis)
-                 (hold-event co ev waitMillis))
-               (dispatch! ev {:handler hd}))))})
+               ;;(if (spos? waitMillis) (hold-event co ev waitMillis))
+               (dispatch! ev
+                          {:handler hd
+                           :dispfn (funky ev)}))))})
       (assoc cfg :ifunc)
       (.init w))
     w))
@@ -230,7 +246,7 @@
 ;;
 (decl-mutable HttpPluglet
   Hierarchical
-  (getParent [me] (:parent @me))
+  (parent [me] (:parent @me))
   Idable
   (id [me] (:emAlias @me))
   LifeCycle
@@ -254,7 +270,7 @@
   (dispose [me] (.stop me))
   (stop [me]
     (let [{:keys [boot]} @me]
-      (some-> boot .stop))))
+      (some-> ^Startable boot .stop))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -262,7 +278,7 @@
   ^:private
   httpspecdef
   {:deps {:$auth [:czlab.wabbit.plugs.auth.core/WebAuth]}
-   :error :czlab.wabbit.plugs.io.http/processOrphan
+   :error :czlab.wabbit.plugs.http/processOrphan
    :info {:name "Web Site"
           :version "1.0.0"}
    :conf {:maxInMemory (* 1024 1024 4)

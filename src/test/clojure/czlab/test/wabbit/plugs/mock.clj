@@ -17,101 +17,74 @@
             [clojure.string :as cs]
             [clojure.java.io :as io])
 
-  (:use [czlab.wabbit.base.core]
+  (:use [czlab.wabbit.base]
+        [czlab.wabbit.xpis]
+        [czlab.nettio.core]
         [czlab.basal.core]
         [czlab.basal.str]
         [czlab.basal.io])
 
-  (:import [czlab.jasal Activable Schedulable]
-           [czlab.wabbit.plugs.io HttpMsg]
-           [czlab.wabbit.sys Execvisor]
-           [czlab.basal Cljrt]
-           [czlab.wabbit.ctl PlugMsg]))
+  (:import [czlab.jasal LifeCycle Activable Schedulable]
+           [czlab.basal Cljrt]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;(set! *warn-on-reflection* true)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- mkexe "" ^Execvisor []
+(defn- mkexe "" []
 
   (let
     [rts (Cljrt/newrt (getCldr) "mock")
      pid (jid<>)
-     cpu (scheduler<> pid)
-     impl (muble<> {:plugs {}})]
+     cpu (scheduler<> pid)]
 
     (reify
       Execvisor
 
-      (homeDir [_] (io/file (sysProp "wabbit.user.dir")))
-      (pkeyBytes [this] (bytesit "hello world"))
-      (pkey [_] (.toCharArray "hello world"))
+      (get-home-dir [_] (io/file (sysProp "wabbit.user.dir")))
+      (uptime-in-millis [_] 0)
+      (get-locale [_] nil)
+      (get-start-time [_] 0)
+      (kill9! [_] )
       (cljrt [_] rts)
+      (get-child [_ sid])
+      (has-child? [_ sid])
+      (get-scheduler [_] cpu)
 
-      (getx [_] impl)
-      (version [_] "1.0")
-      (id [_] pid)
+      KeyAccess
+      (pkey-bytes [this] (bytesit "hello world"))
+      (pkey-chars [_] (.toCharArray "hello world"))
 
-      (uptimeInMillis [_] 0)
-      (locale [_] nil)
-      (startTime [_] 0)
-      (kill9 [_] )
+      SqlAccess
+      (acquire-db-pool [_ gid] nil)
+      (acquire-db-api [_ gid] nil)
+      (dft-db-pool [_] nil)
+      (dft-db-api [_] nil)
+
+      LifeCycle
       (start [this _] )
+      (start [me])
+      (init [_ _])
       (stop [this] )
-
-      (acquireDbPool [_ gid] nil)
-      (acquireDbAPI [_ gid] nil)
-      (dftDbPool [_] nil)
-      (dftDbAPI [_] nil)
-
-      (child [_ sid])
-      (hasChild [_ sid])
-
-      (core [_] cpu)
-      (config [_] {})
-
       (dispose [this]
         (.dispose cpu)
         (.close rts)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- init "" [^Execvisor co]
-    (.activate ^Activable (.core co) ) co)
+(defn- init "" [co]
+    (.activate ^Activable (get-scheduler co) ) co)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn mocker "" ^Execvisor [_] (doto (mkexe) init ))
+(defn mocker "" ^LifeCycle [_] (doto (mkexe) init ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn mockHttpMsg "" []
 
-  (reify HttpMsg
-    (isStale [_] false)
-    (source [_] )
-    (id [_] )
-    (fire [_ arg] )
-    (setTrigger [_ arg] )
-    (cancel [_] )
-    (body [_] )
-    (cookie [_ n] )
-    (cookies [_] )
-    (isSSL [_] false)
-    (localAddr [_] "")
-    (localHost [_] "")
-    (localPort [_] 0)
-    (gist [_] )
-    (remoteAddr [_] )
-    (remoteHost [_] "")
-    (remotePort [_] 0)
-    (routeGist [_] )
-    (scheme [_] "")
-    (serverName [_] "")
-    (serverPort [_] 0)
-    (session [_] )
-    (getx [_] )))
+  (nettyMsg<> {}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF

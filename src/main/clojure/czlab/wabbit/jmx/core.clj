@@ -9,13 +9,14 @@
 (ns ^{:doc ""
       :author "Kenneth Leung"}
 
-  czlab.wabbit.plugs.jmx.core
+  czlab.wabbit.jmx.core
 
   (:require [czlab.basal.logging :as log]
             [clojure.string :as cs])
 
-  (:use [czlab.wabbit.plugs.jmx.bean]
+  (:use [czlab.wabbit.jmx.bean]
         [czlab.wabbit.base]
+        [czlab.wabbit.xpis]
         [czlab.basal.core]
         [czlab.basal.str])
 
@@ -80,8 +81,7 @@
 (defn- startRMI "" [plug]
   (try
     (->> ^long (get-in @plug [:conf :registryPort])
-         LocateRegistry/createRegistry
-         (setf! me :rmi))
+         LocateRegistry/createRegistry (setf! plug :rmi))
     (catch Throwable _
       (mkJMXrror "Failed to create RMI registry" _))))
 
@@ -109,18 +109,17 @@
               env
               (ManagementFactory/getPlatformMBeanServer))]
       (.start conn)
-      (doto plug
-        (setf! :beanSvr (.getMBeanServer conn))
-        (setf! :conn conn)))))
+      (copy* plug {:conn conn
+                   :beanSvr (.getMBeanServer conn) }))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- doReg
   ""
   [^MBeanServer svr ^ObjectName objName ^DynamicMBean mbean]
-  (.registerMBean svr mbean objName)
-  (log/info "jmx-bean: %s" objName)
-  objName)
+  (doto->> objName
+           (.registerMBean svr mbean )
+           (log/info "jmx-bean: %s" )))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -136,20 +135,20 @@
            (setf! me :objNames))
       nm))
   Hierarchical
-  (getParent [me] (:parent @me))
+  (parent [me] (:parent @me))
   Idable
   (id [me] (:emAlias @me))
   Resetable
   (reset [me]
     (doseq [nm (:objNames @me)]
-      (try! (de-reg me nm)))
+      (try! (jmx-dereg me nm)))
     (setf! me :objNames []))
   LifeCycle
   (init [me arg]
     (setf! me :conf (prevarCfg (or arg {}))))
   (start [me] (.start me nil))
   (start [me _]
-    (doto->> me startRMI startJMX )
+    (doto me startRMI startJMX )
     (log/info "JmxPluglet started"))
   (stop [me]
     (let [^JMXConnectorServer c (:conn @me)
