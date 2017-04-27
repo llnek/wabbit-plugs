@@ -106,7 +106,7 @@
          ch (:socket evt)]
      (set-res-content-type res "text/plain")
      (set-res-content res "hello")
-     (reply-result ch res)))
+     (reply-result ch res nil)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -122,7 +122,7 @@
                {:handler #'czlab.test.wabbit.plugs.svcs/httpHandler
                 :host "localhost"
                 :port 8888})
-        (.start s nil)
+        (.start s)
         (pause 1000)
         (let [f (io/file dir "public/test.js")
               _ (.mkdirs (.getParentFile f))
@@ -147,7 +147,7 @@
                 :intervalSecs 1
                 :username "test1"
                 :passwd "secret"})
-        (.start s nil)
+        (.start s)
         (pause 3000)
         (.stop s)
         (.dispose ctr)
@@ -165,7 +165,7 @@
                 :intervalSecs 1
                 :username "test1"
                 :passwd "secret"})
-        (.start s nil)
+        (.start s)
         (pause 3000)
         (.stop s)
         (.dispose ctr)
@@ -178,7 +178,7 @@
                {:handler #'czlab.test.wabbit.plugs.svcs/httpHandler
                 :host "localhost"
                 :port 8888})
-        (.start s nil)
+        (.start s)
         (pause 1000)
         (let [res (h1get "http://localhost:8888/test/get/xxx")
               rc (deref res 2000 nil)
@@ -205,7 +205,7 @@
             s (plugletViaType<> ctr etype "t")]
         (reset! result-var 0)
         (.init s c)
-        (.start s nil)
+        (.start s)
         (pause 3000)
         (.stop s)
         (.dispose ctr)
@@ -228,7 +228,7 @@
             s (plugletViaType<> ctr etype "t")]
         (reset! result-var 0)
         (.init s c)
-        (.start s nil)
+        (.start s)
         (pause 3000)
         (.stop s)
         (.dispose ctr)
@@ -243,7 +243,7 @@
             ctr (mocker :exec)
             s (plugletViaType<> ctr etype "t")]
         (.init s c)
-        (.start s nil)
+        (.start s)
         (reset! result-var 0)
         (dotimes [n 2]
           (pause 1000)
@@ -267,7 +267,7 @@
             s (plugletViaType<> ctr etype "t")]
         (reset! result-var 0)
         (.init s c)
-        (.start s nil)
+        (.start s)
         (pause 2000)
         (.stop s)
         (.dispose ctr)
@@ -281,7 +281,7 @@
             s (plugletViaType<> ctr etype "t")]
         (reset! result-var 0)
         (.init s c)
-        (.start s nil)
+        (.start s)
         (pause 3500)
         (.stop s)
         (.dispose ctr)
@@ -307,8 +307,8 @@
         (mkdirs to)
         (spitUtf8 firstfn "8")
         (reset! result-var 0)
-        (.start s nil)
-        (pause 1000)
+        (.start s)
+        (pause 1500)
         (touch! firstfn)
         (pause 3000)
         (.stop s)

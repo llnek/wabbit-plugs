@@ -124,23 +124,28 @@
                 ^String user
                 port
                 passwd]}
-        (:conf @co)]
-    (when-some [s (.getStore session proto)]
-      (.connect s
-                host
-                ^long port
-                user
-                (stror (strit passwd) nil))
-      (copy* co
-             {:store s
-              :folder (some-> (.getDefaultFolder s)
-                              (.getFolder "INBOX"))})
-      (let [fd (:folder @co)]
-        (when (or (nil? fd)
-                  (not (.exists ^Folder fd)))
-          (unsetf! co :store)
-          (try! (.close s))
-          (throwIOE "cannot find inbox"))))))
+        (:conf @co)
+        s (.getStore session proto)]
+    (if (nil? s)
+      (log/warn "failed to get session store for %s" proto)
+      (do
+        (log/debug "connecting to session store for %s" proto)
+        (.connect s
+                  host
+                  ^long port
+                  user
+                  (stror (strit passwd) nil))
+        (copy* co
+               {:store s
+                :folder (some-> (.getDefaultFolder s)
+                                (.getFolder "INBOX"))})
+        (let [fd (:folder @co)]
+          (when (or (nil? fd)
+                    (not (.exists ^Folder fd)))
+            (log/warn "mail store folder not-good for proto %s" proto)
+            (unsetf! co :store)
+            (try! (.close s))
+            (throwIOE "cannot find inbox")))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

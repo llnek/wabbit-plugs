@@ -60,7 +60,7 @@
 ;;
 (defn dispatch! ""
   ([evt] (dispatch! evt nil))
-  ([evt & arg]
+  ([evt arg]
    (let
      [pid (str "disp#" (seqint2))
       plug (get-pluglet evt)

@@ -60,10 +60,10 @@
 ;;
 (defn- postPoll
   "Only look for new files"
-  [plug {:keys [recvFolder]} ^File f action]
+  [plug recvFolder ^File f action]
   (let
     [orig (.getName f)]
-    (if-some
+    (when-some
       [cf (if (and (not= action :FP-DELETED)
                    (some? recvFolder))
             (try! (doto->> (io/file recvFolder orig)
@@ -117,11 +117,12 @@
     [{:keys [targetFolder
              recvFolder
              intervalSecs
-             ^FileFilter fmask]}
+             ^FileFilter fmask] :as cfg}
      (:conf @plug)
      obs (-> (io/file targetFolder)
              (FileAlterationObserver. fmask))
-     mon (-> (s2ms intervalSecs) FileAlterationMonitor.)]
+     mon (-> (s2ms intervalSecs)
+             FileAlterationMonitor.)]
     (->>
       (proxy [FileAlterationListenerAdaptor][]
         (onFileCreate [f]
@@ -132,6 +133,7 @@
           (postPoll plug recvFolder f :FP-DELETED)))
       (.addListener obs ))
     (.addObserver mon obs)
+    (.start mon)
     mon))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -143,13 +145,13 @@
   (id [me] (:emAlias @me))
   LifeCycle
   (init [me carg]
-    (-> (get-in @me [:pspec :conf])
-        (init2 carg)
-        (prevarCfg)
-        (setf! me :conf)))
+    (->> (-> (get-in @me [:pspec :conf])
+             (init2 carg)
+             (prevarCfg))
+         (setf! me :conf)))
   (start [me] (.start me nil))
   (start [me arg]
-    (let [w #(doto->> (fileMon<> me) (setf! me :mon) .start)]
+    (let [w #(->> (fileMon<> me) (setf! me :mon))]
       (log/info "apache io monitor starting...")
       (->> (cfgTimer (Timer. true) w (:conf @me) false)
            (setf! me :ttask))))

@@ -81,7 +81,7 @@
         loopy (volatile! true)
         ms (s2ms intervalSecs)
         w #(async!
-             (fn [_]
+             (fn []
                (while @loopy
                  (waker plug) (pause ms))))]
     (cfgTimer (Timer. true) w cfg false)
