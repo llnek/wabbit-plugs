@@ -14,8 +14,9 @@
 
   (:use [czlab.test.wabbit.plugs.mock]
         [czlab.wabbit.plugs.core]
-        [czlab.wabbit.xpis]
         [czlab.nettio.client]
+        [czlab.wabbit.xpis]
+        [czlab.nettio.core]
         [czlab.convoy.core]
         [czlab.wabbit.base]
         [czlab.basal.core]
@@ -104,9 +105,9 @@
          res %2
          cfg (:conf @(get-pluglet evt))
          ch (:socket evt)]
-     (set-res-content-type res "text/plain")
-     (set-res-content res "hello")
-     (reply-result ch res nil)))
+     (setHeader (:headers res) "content-type" "text/plain")
+     (->> (assoc res :body "hello")
+          (reply-result ch ))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

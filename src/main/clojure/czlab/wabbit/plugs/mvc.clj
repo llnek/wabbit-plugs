@@ -204,7 +204,7 @@
   ""
   [res file]
   (let
-    [evt (:request @res)
+    [evt (:request res)
      ch (:socket evt)
      co (get-pluglet evt)
      cfg (:conf @co)
@@ -213,14 +213,14 @@
     (try
       (if (or (nil? fp)
               (not (.exists fp)))
-        (do (set-res-status res 404) (reply-result ch res nil))
-        (do (set-res-content res fp) (reply-result ch res nil)))
+        (->> (assoc res :status 404) (reply-result ch ))
+        (->> (assoc res :body fp) (reply-result ch )))
       (catch Throwable e#
         (log/error e# "get: %s" (:uri evt))
         (try!
-          (doto res
-            (set-res-content nil) (set-res-status 500))
-          (reply-result ch res nil))))))
+          (->> (-> (assoc res :status 500)
+                   (assoc :body nil))
+               (reply-result ch )))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -249,8 +249,8 @@
       (getStatic res ffile)
       (let [ch (:socket evt)]
         (log/warn "illegal uri access: %s" fp)
-        (set-res-status res 403)
-        (reply-result (:socket evt) res nil)))))
+        (->> (assoc res :status 403)
+             (reply-result (:socket evt) ))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
