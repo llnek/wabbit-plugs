@@ -102,6 +102,42 @@
 
   (is (do->true (sysProp! "wabbit.user.dir" (fpath *tempfile-repo*))))
 
+  (is (let [_ (sysProp! "wabbit.mock.mail.proto" "pop3s")
+            etype :czlab.wabbit.plugs.mails/POP3
+            ctr (mocker :exec)
+            s (plugletViaType<> ctr etype "t")]
+        (reset! result-var 0)
+        (.init s
+               {:handler #'czlab.test.wabbit.plugs.svcs/mailHandler
+                :host "localhost"
+                :port 7110
+                :intervalSecs 1
+                :username "test1"
+                :passwd "secret"})
+        (.start s)
+        (pause 3000)
+        (.stop s)
+        (.dispose ctr)
+        (> @result-var 8)))
+
+  (is (let [_ (sysProp! "wabbit.mock.mail.proto" "imaps")
+            etype :czlab.wabbit.plugs.mails/IMAP
+            ctr (mocker :exec)
+            s (plugletViaType<> ctr etype "t")]
+        (reset! result-var 0)
+        (.init s
+               {:handler #'czlab.test.wabbit.plugs.svcs/mailHandler
+                :host "localhost"
+                :port 7110
+                :intervalSecs 1
+                :username "test1"
+                :passwd "secret"})
+        (.start s)
+        (pause 3000)
+        (.stop s)
+        (.dispose ctr)
+        (> @result-var 8)))
+
   (is (let [etype :czlab.wabbit.plugs.http/HTTP
             ctr (mocker :exec)
             dir (sysProp "wabbit.user.dir")
@@ -123,41 +159,6 @@
           (.dispose ctr)
           (= "hello" z))))
 
-  (is (let [_ (sysProp! "wabbit.mock.mail.proto" "imaps")
-            etype :czlab.wabbit.plugs.mails/IMAP
-            ctr (mocker :exec)
-            s (plugletViaType<> ctr etype "t")]
-        (reset! result-var 0)
-        (.init s
-               {:handler #'czlab.test.wabbit.plugs.svcs/mailHandler
-                :host "localhost"
-                :port 7110
-                :intervalSecs 1
-                :username "test1"
-                :passwd "secret"})
-        (.start s)
-        (pause 3000)
-        (.stop s)
-        (.dispose ctr)
-        (> @result-var 8)))
-
-  (is (let [_ (sysProp! "wabbit.mock.mail.proto" "pop3s")
-            etype :czlab.wabbit.plugs.mails/POP3
-            ctr (mocker :exec)
-            s (plugletViaType<> ctr etype "t")]
-        (reset! result-var 0)
-        (.init s
-               {:handler #'czlab.test.wabbit.plugs.svcs/mailHandler
-                :host "localhost"
-                :port 7110
-                :intervalSecs 1
-                :username "test1"
-                :passwd "secret"})
-        (.start s)
-        (pause 3000)
-        (.stop s)
-        (.dispose ctr)
-        (> @result-var 8)))
 
   (is (let [etype :czlab.wabbit.plugs.http/HTTP
             ctr (mocker :exec)
