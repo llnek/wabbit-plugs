@@ -9,7 +9,7 @@
 (ns ^{:doc ""
       :author "Kenneth Leung"}
 
-  czlab.wabbit.auth.core
+  czlab.wabbit.shiro.core
 
   ;;(:gen-class)
 
@@ -22,7 +22,7 @@
             [clojure.java.io :as io]
             [czlab.basal.logging :as log])
 
-  (:use [czlab.wabbit.auth.model]
+  (:use [czlab.wabbit.shiro.model]
         [czlab.twisty.codec]
         [czlab.horde.connect]
         [czlab.wabbit.xpis]
