@@ -224,7 +224,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- assetHandler "" [evt res]
+(defn assetLoader "" [evt res]
   (let
     [co (get-pluglet evt)
      {{:keys [publicRootDir]} :wsite :as cfg}
@@ -251,10 +251,6 @@
         (log/warn "illegal uri access: %s" fp)
         (->> (assoc res :status 403)
              (reply-result (:socket evt) ))))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-(defn asset! "" [] assetHandler)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF

@@ -71,15 +71,14 @@
       dsp (:dispfn arg)
       h (or (:handler arg)
             (:handler cfg))
-      v (try (.callVar ^Cljrt clj h)
-             (catch Throwable _ (error! evt nil)))]
+      f (if (var? h) @h)]
      (do->nil
        (log/debug "plug = %s\narg = %s\ncb = %s" (gtid plug) arg h)
        (log/debug "#%s => %s :is disp!" (id?? evt) (id?? plug))
-       (if (fn? v)
+       (if (fn? f)
          (->> (if (fn? dsp)
-                (run-able+id<> pid (dsp v evt))
-                (run-able+id<> pid (v evt)))
+                (run-able+id<> pid (dsp f evt))
+                (run-able+id<> pid (f evt)))
               (.run ^Schedulable sc ))
          (processOrphan evt))))))
 

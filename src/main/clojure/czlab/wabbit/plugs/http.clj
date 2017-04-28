@@ -184,7 +184,7 @@
 ;;
 (defn- boot! "" ^LifeCycle [co]
   (let
-    [asset! #'czlab.wabbit.plugs.mvc/asset!
+    [asset! #'czlab.wabbit.plugs.mvc/assetLoader
      {:keys [waitMillis] :as cfg}
      (:conf @co)
      w (nettyWebServer<>)]

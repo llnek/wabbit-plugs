@@ -39,75 +39,62 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn testHandler "" [] #(do->nil % (swap! result-var + 8)))
+(defn- testHandler "" [evt] (do->nil (swap! result-var + 8)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn fileHandler "" []
-
-  #(let
-     [evt %1
-     {:keys [targetFolder recvFolder]}
-     (:conf @(get-pluglet evt))
-     tp (fpath targetFolder)
-     rp (fpath recvFolder)
-     nm (jid<>)
-     f (:file evt)
-     fp (fpath f)
-     s (slurpUtf8 f)
-     n (convLong s 0)]
-     ;;the file should be in the recv-folder
-     (when (>= (.indexOf fp rp) 0)
-       ;; generate a new file in target-folder
-       (spitUtf8 (io/file tp nm) s)
-       (swap! result-var + n))))
+(defn- fileHandler "" [evt]
+  (let [{:keys [targetFolder recvFolder]}
+        (:conf @(get-pluglet evt))
+        tp (fpath targetFolder)
+        rp (fpath recvFolder)
+        nm (jid<>)
+        f (:file evt)
+        fp (fpath f)
+        s (slurpUtf8 f)
+        n (convLong s 0)]
+    ;;the file should be in the recv-folder
+    (when (>= (.indexOf fp rp) 0)
+      ;; generate a new file in target-folder
+      (spitUtf8 (io/file tp nm) s)
+      (swap! result-var + n))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn sockHandler "" []
-
-  #(let
-     [evt %1
-      dis (DataInputStream. (:sockin evt))
-      dos (DataOutputStream. (:sockout evt))
-      nm (.readInt dis)]
-     (swap! result-var + nm)
-     (.writeInt dos (int nm))
-     (.flush dos)))
+(defn- sockHandler "" [evt]
+  (let [dis (DataInputStream. (:sockin evt))
+        dos (DataOutputStream. (:sockout evt))
+        nm (.readInt dis)]
+    (swap! result-var + nm)
+    (.writeInt dos (int nm))
+    (.flush dos)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn jmsHandler "" []
-
-  #(let [evt %1
-         ^TextMessage msg (:message evt)
-         s (.getText msg)]
-     (assert (hgl? s))
-     (swap! result-var + 8)))
+(defn- jmsHandler "" [evt]
+  (let [^TextMessage msg (:message evt)
+        s (.getText msg)]
+    (assert (hgl? s))
+    (swap! result-var + 8)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn mailHandler "" []
-
-  #(let [evt %1
-         ^MimeMessage msg (:message evt)
-         _ (assert (some? msg))
-         ^Multipart p (.getContent msg)]
-     (assert (some? p))
-     (swap! result-var + 8)))
+(defn- mailHandler "" [evt]
+  (let [^MimeMessage msg (:message evt)
+        _ (assert (some? msg))
+        ^Multipart p (.getContent msg)]
+    (assert (some? p))
+    (swap! result-var + 8)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn httpHandler "" []
-
+(defn- httpHandler "" [evt res]
   (require 'czlab.nettio.resp)
-  #(let [evt %1
-         res %2
-         cfg (:conf @(get-pluglet evt))
-         ch (:socket evt)]
-     (setHeader (:headers res) "content-type" "text/plain")
-     (->> (assoc res :body "hello")
-          (reply-result ch ))))
+  (let [cfg (:conf @(get-pluglet evt))
+        ch (:socket evt)]
+    (setHeader (:headers res) "content-type" "text/plain")
+    (->> (assoc res :body "hello")
+         (reply-result ch ))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
