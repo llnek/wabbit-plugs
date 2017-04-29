@@ -177,7 +177,7 @@
 (defn- funky "" [evt]
   (if
     (satisfies? HttpMsgGist evt)
-    (let [res (http-result (:socket evt) evt)]
+    (let [res (http-result evt)]
       (fn [h e] (h e res)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

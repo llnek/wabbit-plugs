@@ -93,8 +93,8 @@
   (let [cfg (:conf @(get-pluglet evt))
         ch (:socket evt)]
     (setHeader (:headers res) "content-type" "text/plain")
-    (->> (assoc res :body "hello")
-         (reply-result ch ))))
+    (-> (assoc res :body "hello")
+        reply-result )))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

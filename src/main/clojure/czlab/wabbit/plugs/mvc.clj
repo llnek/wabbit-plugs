@@ -213,14 +213,14 @@
     (try
       (if (or (nil? fp)
               (not (.exists fp)))
-        (->> (assoc res :status 404) (reply-result ch ))
-        (->> (assoc res :body fp) (reply-result ch )))
+        (-> (assoc res :status 404) reply-result )
+        (-> (assoc res :body fp) reply-result ))
       (catch Throwable e#
         (log/error e# "get: %s" (:uri evt))
         (try!
-          (->> (-> (assoc res :status 500)
-                   (assoc :body nil))
-               (reply-result ch )))))))
+          (-> (assoc res :status 500)
+              (assoc :body nil)
+              reply-result ))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -249,8 +249,8 @@
       (getStatic res ffile)
       (let [ch (:socket evt)]
         (log/warn "illegal uri access: %s" fp)
-        (->> (assoc res :status 403)
-             (reply-result (:socket evt) ))))))
+        (-> (assoc res :status 403)
+            reply-result )))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF
