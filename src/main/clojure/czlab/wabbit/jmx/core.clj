@@ -95,7 +95,8 @@
      {:keys [registryPort serverPort
              host url contextFactory]}
      (:conf @plug)
-     host (stror host "localhost")
+     host (->> (-> (InetAddress/getLocalHost) .getHostName)
+               (stror host ))
      env (HashMap.)
      endpt (-> (cs/replace (stror url svc) "{{h}}" host)
                (cs/replace "{{s}}" (str serverPort))
@@ -158,7 +159,7 @@
           ^Registry r (:rmi @me)]
       (.reset me)
       (try! (some-> c .stop ))
-      (try!
+      (trye!!
         (some-> r
                 (UnicastRemoteObject/unexportObject  true)))
       (log/info "JmxPluglet stopped")))

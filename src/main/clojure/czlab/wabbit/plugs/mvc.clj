@@ -108,15 +108,10 @@
 ;;
 (defn- asFtlModel "" [m]
 
-  (log/info "asasfksdlkfldsl;fk;sdkfskdlfkds;fksdd")
-  (do-with [x
   (postwalk #(cond
                (map? %) (into {} (map skey %))
                (fn? %) (asFtlMethod %)
-               :else %) m)]
-           (log/info "333333333333333333333333333333")
-           (log/info "x = %s" x
-           )))
+               :else %) m))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -157,11 +152,8 @@
     ^String path model {:keys [xrefModel?]
                         :or {xrefModel? true}}]
    (log/debug "request to render tpl: %s" path)
-   (let [- (log/info "dddddddddddude!!!!!!!!!!!!!!!")
-         t (.getTemplate cfg path)
-         _ (log/info "ttttt = %s" t)
+   (let [t (.getTemplate cfg path)
          m (if xrefModel? (asFtlModel model) model)]
-     (log/info "mmmmmm = %s" m)
      (some-> t (.process m out))
      (str out))))
 
