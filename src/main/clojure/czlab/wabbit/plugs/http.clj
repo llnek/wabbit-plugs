@@ -154,7 +154,7 @@
      {:keys [route cookies]} req]
     (merge req
            {:session (if (and (!false? wantSession?)
-                              (:wantSession? (:info route)))
+                              (:session? (:info route)))
                        (upstream (-> co get-server pkey-bytes)
                                  cookies
                                  (if session (:macit? @session))))
