@@ -95,6 +95,7 @@
      {:keys [registryPort serverPort
              host url contextFactory]}
      (:conf @plug)
+     host (stror host "localhost")
      env (HashMap.)
      endpt (-> (cs/replace (stror url svc) "{{h}}" host)
                (cs/replace "{{s}}" (str serverPort))
@@ -145,7 +146,9 @@
     (setf! me :objNames []))
   LifeCycle
   (init [me arg]
-    (setf! me :conf (prevarCfg (or arg {}))))
+    (let [c (get-in @me [:pspec :conf])]
+      (->> (prevarCfg (merge c arg))
+           (setf! me :conf))))
   (start [me] (.start me nil))
   (start [me _]
     (doto me startRMI startJMX )

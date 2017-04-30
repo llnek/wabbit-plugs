@@ -277,7 +277,7 @@
 (def
   ^:private
   httpspecdef
-  {:deps {:$auth [:czlab.wabbit.plugs.auth.core/WebAuth]}
+  {:deps {:$auth [:czlab.wabbit.shiro.core/WebAuth]}
    :error :czlab.wabbit.plugs.http/processOrphan
    :info {:name "Web Site"
           :version "1.0.0"}

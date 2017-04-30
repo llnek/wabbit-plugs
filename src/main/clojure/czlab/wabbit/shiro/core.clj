@@ -102,29 +102,30 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn newSession<> "" [evt attrs]
-  (let
-    [plug (get-pluglet evt)
-     s (wsession<> (-> plug get-server pkey-bytes)
-                   (:session (:conf @plug)))]
-    (doseq [[k v] attrs] (set-session-attr s k v))
-    s))
+(defn newSession<> ""
+  ([evt] (newSession<> evt nil))
+  ([evt attrs]
+   (let [plug (get-pluglet evt)]
+     (do-with
+       [s (wsession<> (-> plug get-server pkey-bytes)
+                      (:session (:conf @plug)))]
+       (doseq [[k v] attrs] (set-session-attr s k v))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn csrfToken<> "Create or delete a csrf cookie"
 
   ;; if maxAge=-1, browser doesnt sent it back!
+  ^HttpCookie
   [{:keys [domainPath domain]} token]
 
-  (let [ok? (hgl? token)
-        c (HttpCookie. wss/*csrf-cookie*
-                       (if ok? token "*"))]
+  (do-with
+    [c (HttpCookie. wss/*csrf-cookie*
+                    (if (hgl? token) token "*"))]
     (if (hgl? domainPath) (.setPath c domainPath))
     (if (hgl? domain) (.setDomain c domain))
     (.setHttpOnly c true)
-    (. c setMaxAge (if ok? 3600 0))
-    c))
+    (.setMaxAge c (if (hgl? token) 3600 0))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -216,11 +217,11 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defn- getPodKey
+(defn getPodKey
   ""
   ^bytes
   [evt]
-  (-> (:source evt) get-server pkey-bytes))
+  (-> evt get-pluglet get-server pkey-bytes))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -248,14 +249,16 @@
   [pool]
   {:pre [(some? pool)]}
 
-  (let [tbl (->> :czlab.wabbit.auth.model/LoginAccount
+  (let [tbl (->> :czlab.wabbit.shiro.model/LoginAccount
                  (get (:models *auth-meta-cache*))
                  dbtable)]
-    (when-not (tableExist? pool tbl)
-      (applyDDL pool)
-      (if-not (tableExist? pool tbl)
-        (dberr! (rstr (I18N/base)
-                      "auth.no.table" tbl))))))
+    (if-not
+      (tableExist? pool tbl)
+      (applyDDL pool))
+    (if (tableExist? pool tbl)
+      (log/info "czlab.wabbit.shiro.model* - ok")
+      (dberr! (rstr (I18N/base)
+                    "auth.no.table" tbl)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -277,7 +280,7 @@
   [sql role desc]
   {:pre [(some? sql)]}
   (let [m (get (:models sql)
-               :czlab.wabbit.auth.model/AuthRole)
+               :czlab.wabbit.shiro.model/AuthRole)
         rc (-> (dbpojo<> m)
                (dbSetFlds* {:name role
                             :desc desc}))]
@@ -290,7 +293,7 @@
   [sql role]
   {:pre [(some? sql)]}
   (let [m (get (:models sql)
-               :czlab.wabbit.auth.model/AuthRole)]
+               :czlab.wabbit.shiro.model/AuthRole)]
     (exec-sql sql
               (format
                 "delete from %s where %s =?"
@@ -303,7 +306,7 @@
   "List all the roles in db"
   [sql]
   {:pre [(some? sql)]}
-  (find-all sql :czlab.wabbit.auth.model/AuthRole))
+  (find-all sql :czlab.wabbit.shiro.model/AuthRole))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -322,9 +325,10 @@
 
   ([sql user pwdObj props roleObjs]
    {:pre [(some? sql)(hgl? user)]}
-
+(println "sql ======== " sql)
+(println "models ======== " (:models sql))
    (let [m (get (:models sql)
-                :czlab.wabbit.auth.model/LoginAccount)
+                :czlab.wabbit.shiro.model/LoginAccount)
          ps (some-> pwdObj hashed)
          acc
          (->>
@@ -336,7 +340,7 @@
      ;; previous insert. That is, if we fail to set a role, it's
      ;; assumed ok for the account to remain inserted
      (doseq [r roleObjs]
-       (dbSetM2M {:joined :czlab.wabbit.auth.model/AccountRoles
+       (dbSetM2M {:joined :czlab.wabbit.shiro.model/AccountRoles
                   :with sql} acc r))
      (log/debug "created new account %s%s%s%s"
                 "into db: " acc "\nwith meta\n" (meta acc))
@@ -352,7 +356,7 @@
   {:pre [(some? sql)]}
 
   (find-one sql
-            :czlab.wabbit.auth.model/LoginAccount
+            :czlab.wabbit.shiro.model/LoginAccount
             {:email (strim email) }))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -365,7 +369,7 @@
   {:pre [(some? sql)]}
 
   (find-one sql
-            :czlab.wabbit.auth.model/LoginAccount
+            :czlab.wabbit.shiro.model/LoginAccount
             {:acctid (strim user) }))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -435,7 +439,7 @@
   {:pre [(some? sql)]}
 
   (dbClrM2M
-    {:joined :czlab.wabbit.auth.model/AccountRoles :with sql} user role))
+    {:joined :czlab.wabbit.shiro.model/AccountRoles :with sql} user role))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -447,7 +451,7 @@
   {:pre [(some? sql)]}
 
   (dbSetM2M
-    {:joined :czlab.wabbit.auth.model/AccountRoles :with sql} user role))
+    {:joined :czlab.wabbit.shiro.model/AccountRoles :with sql} user role))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -467,7 +471,7 @@
   {:pre [(some? sql)]}
 
   (let [m (get (:models sql)
-               :czlab.wabbit.auth.model/LoginAccount)]
+               :czlab.wabbit.shiro.model/LoginAccount)]
     (exec-sql sql
               (format
                 "delete from %s where %s =?"
@@ -482,7 +486,7 @@
   [sql]
   {:pre [(some? sql)]}
 
-  (find-all sql :czlab.wabbit.auth.model/LoginAccount))
+  (find-all sql :czlab.wabbit.shiro.model/LoginAccount))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -538,7 +542,7 @@
            (hgl? (:principal info))
            (hgl? (:email info)))
       (if (has-account? pa info)
-        (GeneralSecurityException. (str (:principal info)))
+        (GeneralSecurityException. "DuplicateUser")
         (add-account pa info))
 
       :else
