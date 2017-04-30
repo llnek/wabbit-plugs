@@ -157,7 +157,7 @@
                               (:session? (:info route)))
                        (upstream (-> co get-server pkey-bytes)
                                  cookies
-                                 (if session (:macit? @session))))
+                                 (:macit? session)))
             :$source co
             :stale? false
             :id (str "HttpMsg." (seqint2)) })))
