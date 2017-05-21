@@ -19,12 +19,13 @@
    :exposes-methods { }
    :state myState)
 
-  (:require [czlab.twisty.codec :refer [pwd<>]]
-            [czlab.basal.logging :as log])
-
-  (:use [czlab.wabbit.shiro.core]
-        [czlab.horde.connect]
-        [czlab.horde.core])
+  (:require [czlab.twisty.codec :as co :refer [pwd<>]]
+            [czlab.wabbit.shiro.model :as mo]
+            [czlab.wabbit.shiro.core :as sh]
+            [czlab.horde.connect :as ht]
+            [czlab.basal.log :as log]
+            [czlab.basal.core :as c]
+            [czlab.horde.core :as hc])
 
   (:import [org.apache.shiro.realm CachingRealm AuthorizingRealm]
            [org.apache.shiro.subject PrincipalCollection]
@@ -49,11 +50,11 @@
 (defn -doGetAuthenticationInfo
   ""
   [^AuthorizingRealm this ^AuthenticationToken token]
-  (let [db (dbapi<> *jdbc-pool* *meta-cache*)
+  (let [db (ht/dbapi<> sh/*jdbc-pool* sh/*meta-cache*)
         ;;pwd (.getCredentials token)
         user (.getPrincipal token)
-        sql (simple-sqlr db)]
-    (when-some [acc (findLoginAccount sql user)]
+        sql (ht/simple-sqlr db)]
+    (when-some [acc (sh/findLoginAccount sql user)]
       (SimpleAccount. acc
                       (:passwd acc)
                       (.getName this)))))
@@ -63,17 +64,16 @@
 (defn -doGetAuthorizationInfo
   ""
   [^AuthorizingRealm this ^PrincipalCollection principals]
-  (let [db (dbapi<> *jdbc-pool* *meta-cache*)
+  (let [db (ht/dbapi<> sh/*jdbc-pool* sh/*meta-cache*)
         acc (.getPrimaryPrincipal principals)
-        rc (SimpleAccount. acc
-                           (:passwd acc)
-                           (.getName this))
-        sql (simple-sqlr db)
-        j :czlab.wabbit.auth.model/AccountRoles]
-    (let [rs (dbGetM2M {:joined j :with sql} acc) ]
-      (doseq [r rs]
-        (.addRole rc ^String (:name r)))
-      rc)))
+        sql (ht/simple-sqlr db)]
+    (c/do-with
+      [rc (SimpleAccount. acc
+                          (:passwd acc)
+                          (.getName this))]
+      (doseq [r (hc/dbGetM2M {:joined
+                              ::mo/AccountRoles :with sql} acc)]
+        (.addRole rc ^String (:name r))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

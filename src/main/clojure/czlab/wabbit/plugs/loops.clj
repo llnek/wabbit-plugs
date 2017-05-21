@@ -11,16 +11,15 @@
 
   czlab.wabbit.plugs.loops
 
-  (:require [czlab.basal.dates :refer [parseDate]]
-            [czlab.basal.process :refer [async!]]
-            [czlab.basal.meta :refer [getCldr]]
-            [czlab.basal.logging :as log])
-
-  (:use [czlab.wabbit.base]
-        [czlab.wabbit.xpis]
-        [czlab.basal.core]
-        [czlab.basal.str]
-        [czlab.wabbit.plugs.core])
+  (:require [czlab.basal.dates :as dt :refer [parseDate]]
+            [czlab.basal.process :as p :refer [async!]]
+            [czlab.basal.meta :as m :refer [getCldr]]
+            [czlab.basal.log :as log]
+            [czlab.wabbit.base :as b]
+            [czlab.wabbit.xpis :as xp]
+            [czlab.basal.core :as c]
+            [czlab.basal.str :as s]
+            [czlab.wabbit.plugs.core :as pc])
 
   (:import [czlab.jasal Hierarchical LifeCycle Idable]
            [java.util Date Timer TimerTask]
@@ -36,13 +35,13 @@
   [^Timer timer [dw ds] ^long intv func]
 
   (log/info "Scheduling a *repeating* timer: %dms" intv)
-  (if (spos? intv)
-    (do-with [tt (tmtask<> func)]
-      (if (ist? Date dw)
+  (if (c/spos? intv)
+    (c/do-with [tt (c/tmtask<> func)]
+      (if (c/ist? Date dw)
         (.schedule timer tt ^Date dw intv)
         (.schedule timer
                    tt
-                   (long (if (spos? ds) ds 1000)) intv)))))
+                   (long (if (c/spos? ds) ds 1000)) intv)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -51,12 +50,12 @@
   [^Timer timer [dw ds] func]
 
   (log/info "Scheduling a *one-shot* timer at %s" [dw ds])
-  (do-with [tt (tmtask<> func)]
-    (if (ist? Date dw)
+  (c/do-with [tt (c/tmtask<> func)]
+    (if (c/ist? Date dw)
       (.schedule timer tt ^Date dw)
       (.schedule timer
                  tt
-                 (long (if (spos? ds) ds 1000))))))
+                 (long (if (c/spos? ds) ds 1000))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -65,27 +64,27 @@
   [timer wakeup {:keys [intervalSecs
                         delayWhen
                         delaySecs]} repeat?]
-  (let [d [delayWhen (s2ms delaySecs)]]
+  (let [d [delayWhen (pc/s2ms delaySecs)]]
     (if (and repeat?
-             (spos? intervalSecs))
+             (c/spos? intervalSecs))
       (cfgRepeat timer
                  d
-                 (s2ms intervalSecs) wakeup)
+                 (pc/s2ms intervalSecs) wakeup)
       (cfgOnce timer d wakeup))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn scheduleThreadedLoop "" [plug waker]
   (let [{:keys [intervalSecs] :as cfg}
-        (:conf @plug)
-        loopy (volatile! true)
-        ms (s2ms intervalSecs)
-        w #(async!
-             (fn []
-               (while @loopy
-                 (waker plug) (pause ms))))]
-    (cfgTimer (Timer. true) w cfg false)
-    loopy))
+        (:conf @plug)]
+    (c/do-with
+      [loopy (volatile! true)]
+      (let [ms (pc/s2ms intervalSecs)
+            w #(p/async!
+                 (fn []
+                   (while @loopy
+                     (waker plug) (c/pause ms))))]
+        (cfgTimer (Timer. true) w cfg false)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -93,21 +92,21 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(decl-object TimerMsg
-             PlugletMsg
-             (get-pluglet [me] (:$source me)))
+(c/decl-object TimerMsg
+               xp/PlugletMsg
+               (get-pluglet [me] (:$source me)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defmacro ^:private evt<> "" [co repeat?]
-  `(object<> TimerMsg
-             {:id (str "TimerMsg." (seqint2))
-              :$source ~co
-              :tstamp (now<>) }))
+  `(c/object<> TimerMsg
+               {:id (str "TimerMsg." (c/seqint2))
+                :$source ~co
+                :tstamp (c/now<>)}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(decl-mutable TimerPluglet
+(c/decl-mutable TimerPluglet
   Hierarchical
   (parent [me] (:parent @me))
   Idable
@@ -115,17 +114,17 @@
   LifeCycle
   (init [me arg]
     (let [c (get-in @me [:pspec :conf])]
-      (->> (prevarCfg (merge c arg))
-           (setf! me :conf))))
+      (->> (b/prevarCfg (merge c arg))
+           (c/setf! me :conf))))
   (start [me] (.start me nil))
   (start [me arg]
     (let [r? (:repeat? @me)]
       (->> (cfgTimer (Timer. true)
-                     #(dispatch! (evt<> me r?))
+                     #(pc/dispatch! (evt<> me r?))
                      (:conf @me) r?)
-           (setf! me :ttask))))
+           (c/setf! me :ttask))))
   (stop [me]
-    (cancelTimerTask (:ttask @me)))
+    (c/cancelTimerTask (:ttask @me)))
   (dispose [me] (.stop me)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -154,12 +153,12 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- xxxTimer<> "" [_ id spec repeat?]
-  (mutable<> TimerPluglet
-             {:pspec (update-in spec
-                                [:conf] expandVarsInForm)
-              :parent _
-              :emAlias id
-              :repeat? repeat?}))
+  (c/mutable<> TimerPluglet
+               {:pspec (update-in spec
+                                [:conf] b/expandVarsInForm)
+                :parent _
+                :emAlias id
+                :repeat? repeat?}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

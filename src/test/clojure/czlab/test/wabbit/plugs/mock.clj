@@ -11,18 +11,17 @@
 
   czlab.test.wabbit.plugs.mock
 
-  (:require [czlab.basal.scheduler :refer [scheduler<>]]
-            [czlab.basal.meta :refer [getCldr]]
-            [czlab.basal.logging :as log]
+  (:require [czlab.basal.scheduler :as u :refer [scheduler<>]]
+            [czlab.basal.meta :as m :refer [getCldr]]
+            [czlab.basal.log :as log]
             [clojure.string :as cs]
-            [clojure.java.io :as io])
-
-  (:use [czlab.wabbit.base]
-        [czlab.wabbit.xpis]
-        [czlab.nettio.core]
-        [czlab.basal.core]
-        [czlab.basal.str]
-        [czlab.basal.io])
+            [clojure.java.io :as io]
+            [czlab.wabbit.base :as b]
+            [czlab.basal.core :as c]
+            [czlab.basal.str :as s]
+            [czlab.basal.io :as i]
+            [czlab.wabbit.xpis :as xp]
+            [czlab.nettio.core :as nc])
 
   (:import [czlab.jasal LifeCycle Activable Schedulable]
            [czlab.basal Cljrt]))
@@ -35,14 +34,14 @@
 (defn- mkexe "" []
 
   (let
-    [rts (Cljrt/newrt (getCldr) "mock")
-     pid (jid<>)
-     cpu (scheduler<> pid)]
+    [rts (Cljrt/newrt (m/getCldr) "mock")
+     pid (c/jid<>)
+     cpu (u/scheduler<> pid)]
 
     (reify
-      Execvisor
+      xp/Execvisor
 
-      (get-home-dir [_] (io/file (sysProp "wabbit.user.dir")))
+      (get-home-dir [_] (io/file (c/sysProp "wabbit.user.dir")))
       (uptime-in-millis [_] 0)
       (get-locale [_] nil)
       (get-start-time [_] 0)
@@ -52,11 +51,11 @@
       (has-child? [_ sid])
       (get-scheduler [_] cpu)
 
-      KeyAccess
-      (pkey-bytes [this] (bytesit "hello world"))
+      xp/KeyAccess
+      (pkey-bytes [this] (c/bytesit "hello world"))
       (pkey-chars [_] (.toCharArray "hello world"))
 
-      SqlAccess
+      xp/SqlAccess
       (acquire-db-pool [_ gid] nil)
       (acquire-db-api [_ gid] nil)
       (dft-db-pool [_] nil)
@@ -74,7 +73,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- init "" [co]
-    (.activate ^Activable (get-scheduler co) ) co)
+    (.activate ^Activable (xp/get-scheduler co) ) co)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -84,7 +83,7 @@
 ;;
 (defn mockHttpMsg "" []
 
-  (nettyMsg<> {}))
+  (nc/nettyMsg<> {}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF

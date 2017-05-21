@@ -12,19 +12,18 @@
   czlab.wabbit.plugs.mvc
 
   (:require [clojure.walk :refer [postwalk]]
-            [czlab.basal.logging :as log]
+            [czlab.basal.log :as log]
             [clojure.string :as cs]
-            [clojure.java.io :as io])
-
-  (:use [czlab.nettio.resp]
-        [czlab.wabbit.base]
-        [czlab.convoy.core]
-        [czlab.convoy.wess]
-        [czlab.basal.core]
-        [czlab.basal.io]
-        [czlab.basal.str]
-        [czlab.wabbit.xpis]
-        [czlab.wabbit.plugs.core])
+            [clojure.java.io :as io]
+            [czlab.nettio.resp :as nr]
+            [czlab.wabbit.base :as b]
+            [czlab.convoy.core :as cc]
+            [czlab.convoy.wess :as ss]
+            [czlab.basal.core :as c]
+            [czlab.basal.io :as i]
+            [czlab.basal.str :as s]
+            [czlab.wabbit.xpis :as xp]
+            [czlab.wabbit.plugs.core :as pc])
 
   (:import [clojure.lang APersistentMap]
            [freemarker.template
@@ -87,7 +86,7 @@
 
   Object
   (->clj [_]
-    (throwBadArg
+    (c/throwBadArg
       "Failed to convert %s" (class _))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -102,7 +101,7 @@
 ;;
 (defn- skey "" [[k v]]
 
-  [(cs/replace (strKW k) #"[$!#*+\-]" "_")  v])
+  [(cs/replace (s/strKW k) #"[$!#*+\-]" "_")  v])
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -121,7 +120,7 @@
 
   ([] (genFtlConfig nil))
   ([{:keys [root shared] :or {shared {}}}]
-   (let [cfg (Configuration.)]
+   (c/do-with [cfg (Configuration.)]
      (if-some [dir (io/file root)]
        (when (.exists dir)
          (log/info "freemarker template source: %s" root)
@@ -129,8 +128,7 @@
            (.setDirectoryForTemplateLoading dir)
            (.setObjectWrapper (DefaultObjectWrapper.)))
          (doseq [[k v] (asFtlModel shared)]
-           (.setSharedVariable cfg ^String k v))))
-     cfg)))
+           (.setSharedVariable cfg ^String k v)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -163,10 +161,10 @@
   "" ^APersistentMap [co tpath data]
 
   (let
-    [ts (str "/" (triml tpath "/"))
+    [ts (str "/" (s/triml tpath "/"))
      c (:ftlCfg @co)
      out (renderFtl c ts data)]
-    {:data (xdata<> out)
+    {:data (i/xdata<> out)
      :ctype
      (cond
        (.endsWith ts ".json") "application/json"
@@ -183,7 +181,7 @@
   [^String path]
 
   (let [pos (.lastIndexOf path (int \/))]
-    (if (spos? pos)
+    (if (c/spos? pos)
       (let [p1 (.indexOf path (int \?) pos)
             p2 (.indexOf path (int \&) pos)
             p3 (cond
@@ -194,8 +192,7 @@
                  (> p2 0) p2
                  :else -1)]
         (if (> p3 0)
-          (.substring path 0 p3)
-          path))
+          (.substring path 0 p3) path))
       path)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -206,51 +203,51 @@
   (let
     [evt (:request res)
      ch (:socket evt)
-     co (get-pluglet evt)
+     co (xp/get-pluglet evt)
      cfg (:conf @co)
      fp (io/file file)]
-    (log/debug "serving file: %s" (fpath fp))
+    (log/debug "serving file: %s" (c/fpath fp))
     (try
       (if (or (nil? fp)
               (not (.exists fp)))
-        (-> (assoc res :status 404) reply-result )
-        (-> (assoc res :body fp) reply-result ))
+        (-> (assoc res :status 404) cc/reply-result )
+        (-> (assoc res :body fp) cc/reply-result ))
       (catch Throwable e#
         (log/error e# "get: %s" (:uri evt))
-        (try!
+        (c/try!
           (-> (assoc res :status 500)
               (assoc :body nil)
-              reply-result ))))))
+              cc/reply-result ))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn assetLoader "" [evt res]
   (let
-    [co (get-pluglet evt)
+    [co (xp/get-pluglet evt)
      {{:keys [publicRootDir]} :wsite :as cfg}
      (:conf @co)
-     homeDir (fpath (-> co get-server get-home-dir))
+     homeDir (c/fpath (-> co xp/get-server xp/get-home-dir))
      r (:route evt)
      mp (str (some-> (:info r) :mountPoint))
      ;;need to do this for testing only since expandvars
      ;;not called
-     publicRootDir (expandVars publicRootDir)
+     publicRootDir (b/expandVars publicRootDir)
      pubDir (io/file publicRootDir)
      fp (-> (reduce
               #(cs/replace-first %1 "{}" %2) mp (:groups r))
-            maybeStripUrlCrap strim)
+            maybeStripUrlCrap s/strim)
      ffile (io/file pubDir fp)
      check? (:fileAccessCheck? cfg)]
     (log/info "request for asset: dir=%s, fp=%s" publicRootDir fp)
-    (if (and (hgl? fp)
+    (if (and (s/hgl? fp)
              (or (false? check?)
-                 (.startsWith (fpath ffile)
-                              (fpath pubDir))))
+                 (.startsWith (c/fpath ffile)
+                              (c/fpath pubDir))))
       (getStatic res ffile)
       (let [ch (:socket evt)]
         (log/warn "illegal uri access: %s" fp)
         (-> (assoc res :status 403)
-            reply-result )))))
+            cc/reply-result )))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF

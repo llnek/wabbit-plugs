@@ -14,7 +14,7 @@
    ;;[com.google.code.findbugs/jsr305 "3.0.1"]
    [org.freemarker/freemarker "2.3.26-incubating"]
    [commons-net/commons-net "3.6"]
-   [org.apache.shiro/shiro-core "1.3.2"]
+   [org.apache.shiro/shiro-core "1.4.0"]
    [io.czlab/nettio "1.0.0"]
    [io.czlab/wabbit "1.0.0"]]
 

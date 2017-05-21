@@ -11,14 +11,13 @@
 
   czlab.wabbit.jmx.core
 
-  (:require [czlab.basal.logging :as log]
-            [clojure.string :as cs])
-
-  (:use [czlab.wabbit.jmx.bean]
-        [czlab.wabbit.base]
-        [czlab.wabbit.xpis]
-        [czlab.basal.core]
-        [czlab.basal.str])
+  (:require [czlab.wabbit.jmx.bean :as bn]
+            [czlab.basal.log :as log]
+            [clojure.string :as cs]
+            [czlab.wabbit.base :as b]
+            [czlab.wabbit.xpis :as xp]
+            [czlab.basal.core :as c]
+            [czlab.basal.str :as s])
 
   (:import [java.net InetAddress MalformedURLException]
            [java.rmi.registry LocateRegistry Registry]
@@ -59,7 +58,7 @@
 
   ([^String domain ^String beanName paths]
    (let [cs (seq (or paths []))
-         sb (strbf<>)]
+         sb (s/strbf<>)]
      (doto sb
        (.append domain)
        (.append ":")
@@ -81,7 +80,7 @@
 (defn- startRMI "" [plug]
   (try
     (->> ^long (get-in @plug [:conf :registryPort])
-         LocateRegistry/createRegistry (setf! plug :rmi))
+         LocateRegistry/createRegistry (c/setf! plug :rmi))
     (catch Throwable _
       (mkJMXrror "Failed to create RMI registry" _))))
 
@@ -96,45 +95,45 @@
              host url contextFactory]}
      (:conf @plug)
      host (->> (-> (InetAddress/getLocalHost) .getHostName)
-               (stror host ))
+               (s/stror host ))
      env (HashMap.)
-     endpt (-> (cs/replace (stror url svc) "{{h}}" host)
+     endpt (-> (cs/replace (s/stror url svc) "{{h}}" host)
                (cs/replace "{{s}}" (str serverPort))
                (cs/replace "{{r}}" (str registryPort)))]
     (log/debug "jmx service url: %s" endpt)
     (.put env
           "java.naming.factory.initial"
-          (stror contextFactory cfc))
+          (s/stror contextFactory cfc))
     (let
       [conn (JMXConnectorServerFactory/newJMXConnectorServer
               (JMXServiceURL. endpt)
               env
               (ManagementFactory/getPlatformMBeanServer))]
       (.start conn)
-      (copy* plug {:conn conn
-                   :beanSvr (.getMBeanServer conn) }))))
+      (c/copy* plug {:conn conn
+                     :beanSvr (.getMBeanServer conn) }))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- doReg
   ""
   [^MBeanServer svr ^ObjectName objName ^DynamicMBean mbean]
-  (doto->> objName
-           (.registerMBean svr mbean )
-           (log/info "jmx-bean: %s" )))
+  (c/doto->> objName
+             (.registerMBean svr mbean )
+             (log/info "jmx-bean: %s" )))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(decl-mutable JmsPlugletObj
-  JmxPluglet
+(c/decl-mutable JmsPlugletObj
+  xp/JmxPluglet
   (jmx-dereg [me nname]
     (-> ^MBeanServer
         (:beanSvr @me) (.unregisterMBean nname)))
   (jmx-reg [me obj domain nname paths]
     (let [nm (objectName<> domain nname paths)]
-      (->> (doReg (:beanSvr @me) nm (jmxBean<> obj))
+      (->> (doReg (:beanSvr @me) nm (bn/jmxBean<> obj))
            (conj (:objNames @me))
-           (setf! me :objNames))
+           (c/setf! me :objNames))
       nm))
   Hierarchical
   (parent [me] (:parent @me))
@@ -143,13 +142,13 @@
   Resetable
   (reset [me]
     (doseq [nm (:objNames @me)]
-      (try! (jmx-dereg me nm)))
-    (setf! me :objNames []))
+      (c/try! (.jmx-dereg me nm)))
+    (c/setf! me :objNames []))
   LifeCycle
   (init [me arg]
     (let [c (get-in @me [:pspec :conf])]
-      (->> (prevarCfg (merge c arg))
-           (setf! me :conf))))
+      (->> (b/prevarCfg (merge c arg))
+           (c/setf! me :conf))))
   (start [me] (.start me nil))
   (start [me _]
     (doto me startRMI startJMX )
@@ -158,8 +157,8 @@
     (let [^JMXConnectorServer c (:conn @me)
           ^Registry r (:rmi @me)]
       (.reset me)
-      (try! (some-> c .stop ))
-      (trye!!
+      (c/try! (some-> c .stop))
+      (c/trye!!
         (some-> r
                 (UnicastRemoteObject/unexportObject  true)))
       (log/info "JmxPluglet stopped")))
@@ -184,13 +183,13 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn JmxMonitor "" [ctr pid]
-  (mutable<> JmsPlugletObj
-             {:pspec (update-in specdef
-                                [:conf]
-                                expandVarsInForm)
-              :parent ctr
-              :emAlias pid
-              :objNames [] }))
+  (c/mutable<> JmsPlugletObj
+               {:pspec (update-in specdef
+                                  [:conf]
+                                  b/expandVarsInForm)
+                :parent ctr
+                :emAlias pid
+                :objNames [] }))
 
 ;; jconsole port
 ;;(setRegistryPort [_ p] (.setv impl :registryPort p))

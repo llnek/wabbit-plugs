@@ -11,30 +11,29 @@
 
   czlab.wabbit.plugs.http
 
-  (:require [czlab.convoy.util :refer [parseBasicAuth]]
-            [czlab.basal.format :refer [readEdn]]
-            [czlab.basal.logging :as log]
+  (:require [czlab.convoy.util :as ct :refer [parseBasicAuth]]
+            [czlab.basal.format :as f :refer [readEdn]]
             [czlab.wabbit.plugs.mvc :as mvc]
+            [czlab.wabbit.plugs.core :as pc]
+            [czlab.nettio.discard :as ds]
+            [czlab.convoy.routes :as cr]
+            [czlab.nettio.server :as sv]
+            [czlab.twisty.codec :as co]
+            [czlab.nettio.core :as nc]
+            [czlab.wabbit.base :as b]
+            [czlab.wabbit.xpis :as xp]
+            [czlab.convoy.core :as cc]
+            [czlab.convoy.wess :as ss]
+            [czlab.twisty.ssl :as ssl]
+            [czlab.basal.log :as log]
             [clojure.java.io :as io]
-            [clojure.string :as cs])
+            [czlab.basal.core :as c]
+            [czlab.basal.io :as i]
+            [clojure.string :as cs]
+            [czlab.basal.str :as s]
+            [czlab.basal.meta :as m])
 
-  (:use [czlab.wabbit.plugs.core]
-        [czlab.nettio.discarder]
-        [czlab.convoy.routes]
-        [czlab.nettio.server]
-        [czlab.twisty.codec]
-        [czlab.nettio.core]
-        [czlab.wabbit.base]
-        [czlab.wabbit.xpis]
-        [czlab.convoy.core]
-        [czlab.convoy.wess]
-        [czlab.twisty.ssl]
-        [czlab.basal.core]
-        [czlab.basal.io]
-        [czlab.basal.str]
-        [czlab.basal.meta])
-
-  (:import [czlab.nettio.core NettyWsockMsg NettyHttpMsg]
+  (:import [czlab.nettio.core NettyWsockMsg NettyH1Msg]
            [java.nio.channels ClosedChannelException]
            [io.netty.handler.codec DecoderException]
            [clojure.lang IDeref Atom APersistentMap]
@@ -106,10 +105,10 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(extend-protocol PlugletMsg
+(extend-protocol xp/PlugletMsg
   NettyWsockMsg
   (get-pluglet [me] (:$source me))
-  NettyHttpMsg
+  NettyH1Msg
   (get-pluglet [me] (:$source me)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -118,20 +117,20 @@
   "Scan and parse if exists basic authentication"
   ^APersistentMap
   [evt]
-  (if-some+
-    [v (msgHeader evt auth-token)] (parseBasicAuth v)))
+  (c/if-some+
+    [v (cc/msgHeader evt auth-token)] (ct/parseBasicAuth v)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- maybeLoadRoutes
   "" [{:keys [routes]}]
-  (when-not (empty? routes) (loadRoutes routes)))
+  (when-not (empty? routes) (cr/loadRoutes routes)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- resumeOnExpiry "" [evt]
   (try
-    (replyStatus (:socket evt) 500)
+    (nc/replyStatus (:socket evt) 500)
     (catch ClosedChannelException _
       (log/warn "channel closed already"))
     (catch Throwable t# (log/exception t#))))
@@ -140,10 +139,10 @@
 ;;
 (defn- wsockEvent<> "" [co ch msg]
   (merge msg
-         {:id (str "WsockMsg." (seqint2))
+         {:id (str "WsockMsg." (c/seqint2))
           :socket ch
           :$source co
-          :ssl? (maybeSSL? ch) }))
+          :ssl? (nc/maybeSSL? ch) }))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -153,31 +152,33 @@
      (:conf @co)
      {:keys [route cookies]} req]
     (merge req
-           {:session (if (and (!false? wantSession?)
+           {:session (if (and (c/!false? wantSession?)
                               (:session? (:info route)))
-                       (upstream (-> co get-server pkey-bytes)
-                                 cookies
-                                 (:macit? session)))
+                       (ss/upstream (-> co
+                                        xp/get-server
+                                        xp/pkey-bytes)
+                                    cookies
+                                    (:macit? session)))
             :$source co
             :stale? false
-            :id (str "HttpMsg." (seqint2)) })))
+            :id (str "HttpMsg." (c/seqint2))})))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- evt<>
   "" [co ch msg]
   (cond
-    (satisfies? WsockMsgGist msg)
+    (satisfies? cc/WsockMsgGist msg)
     (wsockEvent<> co ch msg)
-    (satisfies? HttpMsgGist msg)
+    (satisfies? cc/HttpMsgGist msg)
     (httpEvent<> co ch msg)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- funky "" [evt]
   (if
-    (satisfies? HttpMsgGist evt)
-    (let [res (http-result evt)]
+    (satisfies? cc/HttpMsgGist evt)
+    (let [res (cc/http-result evt)]
       (fn [h e] (h e res)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -186,39 +187,35 @@
   (let
     [asset! #'czlab.wabbit.plugs.mvc/assetLoader
      {:keys [waitMillis] :as cfg}
-     (:conf @co)
-     w (nettyWebServer<>)]
-    (->>
-      #(let [_ %1]
-         {:h1
-          (proxy [InboundHandler][]
-            (channelRead0 [ctx msg]
-              (let [ev (evt<> co (ch?? ctx) msg)
+     (:conf @co)]
+    (c/do-with
+      [w
+       (-> {:hh1
+            (fn [ctx msg]
+              (let [ev (evt<> co (nc/ch?? ctx) msg)
                     {:keys [static? handler]}
                     (get-in msg [:route :info])
                     hd (if (and static?
                                 (nil? handler)) asset! handler)]
-               ;;(if (spos? waitMillis) (hold-event co ev waitMillis))
-               (dispatch! ev
-                          {:handler hd
-                           :dispfn (funky ev)}))))})
-      (assoc cfg :ifunc)
-      (.init w))
-    w))
+                ;;(if (spos? waitMillis) (hold-event co ev waitMillis))
+                (pc/dispatch! ev
+                              {:handler hd
+                               :dispfn (funky ev)})))}
+           sv/nettyWebServer<>)])))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn processOrphan
   "" [evt error]
   ;; 500 or 503
-  (let [ch (:socket evt)] (replyStatus ch 500)))
+  (let [ch (:socket evt)] (nc/replyStatus ch 500)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn Discarder! "" [func arg]
   (let
     [^LifeCycle
-     w (discardHTTPD<> func arg)] (.start w arg) #(.stop w)))
+     w (ds/discardHTTPD<> func arg)] (.start w arg) #(.stop w)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -231,41 +228,40 @@
                 port
                 passwd] :as cfg}
         (merge conf cfg0)
-        ssl? (hgl? serverKey)]
+        ssl? (s/hgl? serverKey)]
     (if ssl?
-      (test-cond "server-key file url"
-                 (. ^String serverKey startsWith "file:")))
-    (->>
-      {:port (if-not (spos? port) (if ssl? 443 80) port)
-       :routes (maybeLoadRoutes cfg)
-       :passwd (p-text (pwd<> passwd pkey))
-       :serverKey (if ssl? (io/as-url serverKey))}
-      (merge cfg ))))
+      (c/test-cond "server-key file url"
+                   (. ^String serverKey startsWith "file:")))
+    (merge cfg
+           {:port (if-not (c/spos? port) (if ssl? 443 80) port)
+            :routes (maybeLoadRoutes cfg)
+            :passwd (co/p-text (co/pwd<> passwd pkey))
+            :serverKey (if ssl? (io/as-url serverKey))})))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(decl-mutable HttpPluglet
+(c/decl-mutable HttpPluglet
   Hierarchical
   (parent [me] (:parent @me))
   Idable
   (id [me] (:emAlias @me))
   LifeCycle
   (init [me arg]
-    (let [k (-> me get-server pkey-chars)
+    (let [k (-> me xp/get-server xp/pkey-chars)
           c (get-in @me [:pspec :conf])
-          cfg (prevarCfg (basicfg k c arg))
+          cfg (b/prevarCfg (basicfg k c arg))
           {:keys [publicRootDir pageDir]}
           (:wsite cfg)
           pub (io/file (str publicRootDir)
                        (str pageDir))]
-      (when (dirReadWrite? pub)
-        (log/debug "freemarker tpl root: %s" (fpath pub))
-        (setf! me :ftlCfg (mvc/genFtlConfig {:root pub})))
-      (setf! me :conf cfg)))
+      (when (i/dirReadWrite? pub)
+        (log/debug "freemarker tpl root: %s" (c/fpath pub))
+        (c/setf! me :ftlCfg (mvc/genFtlConfig {:root pub})))
+      (c/setf! me :conf cfg)))
   (start [me] (.start me nil))
   (start [me arg]
     (let [w (boot! me)]
-      (setf! me :boot w)
+      (c/setf! me :boot w)
       (.start w (:conf @me))))
   (dispose [me] (.stop me))
   (stop [me]
@@ -328,12 +324,12 @@
 (defn HTTP ""
   ([_ id] (HTTP _ id (HTTPSpec)))
   ([_ id spec]
-   (mutable<> HttpPluglet
-              {:pspec (update-in spec
-                                 [:conf] expandVarsInForm)
-               :parent _
-               :emAlias id
-               :timer (Timer. true)})))
+   (c/mutable<> HttpPluglet
+                {:pspec (update-in spec
+                                   [:conf] b/expandVarsInForm)
+                 :parent _
+                 :emAlias id
+                 :timer (Timer. true)})))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF

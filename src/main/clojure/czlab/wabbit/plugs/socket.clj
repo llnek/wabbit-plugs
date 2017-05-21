@@ -11,16 +11,15 @@
 
   czlab.wabbit.plugs.socket
 
-  (:require [czlab.basal.process :refer [async!]]
-            [czlab.basal.meta :refer [getCldr]]
-            [czlab.basal.io :refer [closeQ]]
-            [czlab.basal.logging :as log])
-
-  (:use [czlab.wabbit.plugs.core]
-        [czlab.wabbit.xpis]
-        [czlab.basal.core]
-        [czlab.basal.str]
-        [czlab.wabbit.base])
+  (:require [czlab.basal.process :as p :refer [async!]]
+            [czlab.basal.meta :as m :refer [getCldr]]
+            [czlab.basal.io :as i :refer [closeQ]]
+            [czlab.basal.log :as log]
+            [czlab.wabbit.plugs.core :as pc]
+            [czlab.wabbit.xpis :as xp]
+            [czlab.basal.core :as c]
+            [czlab.basal.str :as s]
+            [czlab.wabbit.base :as b])
 
   (:import [java.net InetAddress ServerSocket Socket]
            [clojure.lang APersistentMap]
@@ -30,35 +29,34 @@
             Idable
             Hierarchical]))
 
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;(set! *warn-on-reflection* true)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(decl-object TcpMsg
-             PlugletMsg
-             (get-pluglet [me] (:$source me))
-             Disposable
-             (dispose [me]
-                      (closeQ (:socket me))))
+(c/decl-object TcpMsg
+               xp/PlugletMsg
+               (get-pluglet [me] (:$source me))
+               Disposable
+               (dispose [me]
+                        (i/closeQ (:socket me))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- evt<> "" [co ^Socket socket]
-  (object<> TcpMsg
-            {:sockout (.getOutputStream socket)
-             :sockin (.getInputStream socket)
-             :id (str "TcpMsg." (seqint2))
-             :$source co
-             :socket socket}))
+  (c/object<> TcpMsg
+              {:sockout (.getOutputStream socket)
+               :sockin (.getInputStream socket)
+               :id (str "TcpMsg." (c/seqint2))
+               :$source co
+               :socket socket}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- sockItDown "" [co soc]
-  (try!
+  (c/try!
     (log/debug "opened socket: %s" soc)
-    (dispatch! (evt<> co soc))))
+    (pc/dispatch! (evt<> co soc))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -67,15 +65,15 @@
   [{:keys [timeoutMillis backlog host port]}]
 
   (let
-    [ip (if (hgl? host)
+    [ip (if (s/hgl? host)
           (InetAddress/getByName host)
-          (InetAddress/getLocalHost))
-     _ (test-pos "socket port" port)
-     soc (ServerSocket. port
-                        (int (or backlog 100)) ip)]
-    (log/info "Server socket %s (bound?) %s" soc (.isBound soc))
-    (.setReuseAddress soc true)
-    soc))
+          (InetAddress/getLocalHost))]
+    (c/test-pos "socket port" port)
+    (c/do-with
+      [soc (ServerSocket. port
+                          (int (or backlog 100)) ip)]
+      (log/info "Server socket %s (bound?) %s" soc (.isBound soc))
+      (.setReuseAddress soc true))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -95,7 +93,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(decl-mutable SocketPluglet
+(c/decl-mutable SocketPluglet
   Hierarchical
   (parent [me] (:parent @me))
   Idable
@@ -105,35 +103,35 @@
   (start [me _]
     (when-some
       [ss (ssoc<> (:conf @me))]
-      (setf! me :ssoc ss)
-      (async!
+      (c/setf! me :ssoc ss)
+      (p/async!
         #(while (not (.isClosed ss))
            (try
              (sockItDown me (.accept ss))
              (catch Throwable t
                (let [m (.getMessage t)]
-                 (if-not (and (hasNoCase? m "socket")
-                              (hasNoCase? m "closed"))
+                 (if-not (and (s/hasNoCase? m "socket")
+                              (s/hasNoCase? m "closed"))
                    (log/warn t "")))))))))
   (init [me arg]
     (let [c (get-in @me [:pspec :conf])]
-      (doto->> (prevarCfg (merge c arg))
-               (setf! me :conf))))
+      (c/doto->> (b/prevarCfg (merge c arg))
+                 (c/setf! me :conf))))
   (dispose [me] (.stop me))
   (stop [me]
-    (closeQ (:ssoc @me))))
+    (i/closeQ (:ssoc @me))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn SocketIO ""
   ([_ id] (SocketIO _ id (SocketIOSpec)))
   ([_ id spec]
-   (mutable<> SocketPluglet
-              {:pspec (update-in spec
-                                 [:conf]
-                                 expandVarsInForm)
-               :parent _
-               :emAlias id})))
+   (c/mutable<> SocketPluglet
+                {:pspec (update-in spec
+                                   [:conf]
+                                   b/expandVarsInForm)
+                 :parent _
+                 :emAlias id})))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF

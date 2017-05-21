@@ -11,15 +11,14 @@
 
   czlab.wabbit.plugs.jms
 
-  (:require [czlab.basal.logging :as log])
-
-  (:use [czlab.twisty.codec]
-        [czlab.wabbit.base]
-        [czlab.wabbit.xpis]
-        [czlab.basal.core]
-        [czlab.basal.io]
-        [czlab.basal.str]
-        [czlab.wabbit.plugs.core])
+  (:require [czlab.basal.log :as log]
+            [czlab.twisty.codec :as co]
+            [czlab.wabbit.base :as b]
+            [czlab.wabbit.xpis :as xp]
+            [czlab.basal.core :as c]
+            [czlab.basal.io :as i]
+            [czlab.basal.str :as s]
+            [czlab.wabbit.plugs.core :as pc])
 
   (:import [java.util Hashtable Properties ResourceBundle]
            [czlab.jasal Hierarchical LifeCycle Idable]
@@ -49,25 +48,23 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;(set! *warn-on-reflection* true)
 
-(decl-object JmsMsg
-             PlugletMsg
-             (get-pluglet [me] (:$source me)))
+(c/decl-object JmsMsg
+               xp/PlugletMsg
+               (get-pluglet [me] (:$source me)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defmacro ^:private evt<>
   "" [co msg]
 
-  `(object<> JmsMsg
-             {:id (str "JmsMsg." (seqint2))
-              :$source ~co
-              :message ~msg }))
+  `(c/object<> JmsMsg
+               {:id (str "JmsMsg." (c/seqint2)) :$source ~co :message ~msg}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defmacro ^:private onMsg "" [co msg]
   ;;if (msg!=null) block { () => msg.acknowledge() }
-  `(dispatch! (evt<> ~co ~msg)))
+  `(pc/dispatch! (evt<> ~co ~msg)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -78,25 +75,26 @@
   (let
     [{:keys [destination jmsPwd jmsUser]}
      (:conf @co)
-     pwd (->> co get-server
-              pkey-chars (pwd<> jmsPwd) p-text)
-     c (.lookup ctx ^String destination)
-     ^Connection
-     conn (if (hgl? jmsUser)
-            (.createConnection
-              cf
-              ^String jmsUser
-              (stror (strit pwd) nil))
-            (.createConnection cf))]
-    (if (ist? Destination c)
-      ;;TODO ? ack always ?
-      (-> (.createSession conn false Session/CLIENT_ACKNOWLEDGE)
-          (.createConsumer c)
-          (.setMessageListener
-            (reify MessageListener
-              (onMessage [_ m] (onMsg co m)))))
-      (throwIOE "Object not of Destination type"))
-    conn))
+     pwd (->> co
+              xp/get-server
+              xp/pkey-chars (co/pwd<> jmsPwd) co/p-text)
+     c (.lookup ctx ^String destination)]
+    (c/do-with
+      [^Connection
+       conn (if (s/hgl? jmsUser)
+              (.createConnection
+                cf
+                ^String jmsUser
+                (s/stror (c/strit pwd) nil))
+              (.createConnection cf))]
+      (if (c/ist? Destination c)
+        ;;TODO ? ack always ?
+        (-> (.createSession conn false Session/CLIENT_ACKNOWLEDGE)
+            (.createConsumer c)
+            (.setMessageListener
+              (reify MessageListener
+                (onMessage [_ m] (onMsg co m)))))
+        (c/throwIOE "Object not of Destination type")))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -107,26 +105,28 @@
   (let
     [{:keys [destination jmsUser durable? jmsPwd]}
      (:conf @co)
-     pwd (->> co get-server
-              pkey-chars (pwd<> jmsPwd) p-text)
-     conn (if (hgl? jmsUser)
-            (.createTopicConnection
-              cf
-              ^String jmsUser
-              (stror (strit pwd) nil))
-            (.createTopicConnection cf))
-     s (.createTopicSession
-         conn false Session/CLIENT_ACKNOWLEDGE)
-     t (.lookup ctx ^String destination)]
-    (if-not (ist? Topic t)
-      (throwIOE "Object not of Topic type"))
-    (-> (if durable?
-          (.createDurableSubscriber s t (jid<>))
-          (.createSubscriber s t))
-        (.setMessageListener
-          (reify MessageListener
-            (onMessage [_ m] (onMsg co m)))))
-    conn))
+     pwd (->> co
+              xp/get-server
+              xp/pkey-chars (co/pwd<> jmsPwd) co/p-text)]
+    (c/do-with
+      [conn (if (s/hgl? jmsUser)
+              (.createTopicConnection
+                cf
+                ^String jmsUser
+                (s/stror (c/strit pwd) nil))
+              (.createTopicConnection cf))]
+      (let
+        [s (.createTopicSession
+             conn false Session/CLIENT_ACKNOWLEDGE)
+         t (.lookup ctx ^String destination)]
+        (if-not (c/ist? Topic t)
+          (c/throwIOE "Object not of Topic type"))
+        (-> (if durable?
+              (.createDurableSubscriber s t (c/jid<>))
+              (.createSubscriber s t))
+            (.setMessageListener
+              (reify MessageListener
+                (onMessage [_ m] (onMsg co m)))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -137,24 +137,26 @@
   (let
     [{:keys [destination jmsUser jmsPwd]}
      (:conf @co)
-     pwd (->> co get-server
-              pkey-chars (pwd<> jmsPwd) p-text)
-     conn (if (hgl? jmsUser)
-            (.createQueueConnection
-              cf
-              ^String jmsUser
-              (stror (strit pwd) nil))
-            (.createQueueConnection cf))
-     s (.createQueueSession conn
-                            false Session/CLIENT_ACKNOWLEDGE)
-     q (.lookup ctx ^String destination)]
-    (if-not (ist? Queue q)
-      (throwIOE "Object not of Queue type"))
-    (-> (.createReceiver s ^Queue q)
-        (.setMessageListener
-          (reify MessageListener
-            (onMessage [_ m] (onMsg co m)))))
-    conn))
+     pwd (->> co
+              xp/get-server
+              xp/pkey-chars (co/pwd<> jmsPwd) co/p-text)]
+    (c/do-with
+      [conn (if (s/hgl? jmsUser)
+              (.createQueueConnection
+                cf
+                ^String jmsUser
+                (s/stror (c/strit pwd) nil))
+              (.createQueueConnection cf))]
+      (let
+        [s (.createQueueSession conn
+                                false Session/CLIENT_ACKNOWLEDGE)
+         q (.lookup ctx ^String destination)]
+        (if-not (c/ist? Queue q)
+          (c/throwIOE "Object not of Queue type"))
+        (-> (.createReceiver s ^Queue q)
+            (.setMessageListener
+              (reify MessageListener
+                (onMessage [_ m] (onMsg co m)))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -162,8 +164,8 @@
   ""
   [pkey {:keys [jndiPwd jmsPwd] :as cfg}]
 
-  (-> (assoc cfg :jndiPwd (p-text (pwd<> jndiPwd pkey)))
-      (assoc :jmsPwd (p-text (pwd<> jmsPwd pkey)))))
+  (-> (assoc cfg :jndiPwd (co/p-text (co/pwd<> jndiPwd pkey)))
+      (assoc :jmsPwd (co/p-text (co/pwd<> jmsPwd pkey)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -174,56 +176,55 @@
   [co {:keys [contextFactory
               providerUrl
               jndiUser jndiPwd connFactory]}]
-
   (let
     [vars (Hashtable.)]
-    (if (hgl? providerUrl)
+    (if (s/hgl? providerUrl)
       (.put vars Context/PROVIDER_URL providerUrl))
-    (if (hgl? contextFactory)
+    (if (s/hgl? contextFactory)
       (.put vars
             Context/INITIAL_CONTEXT_FACTORY
             contextFactory))
-    (when (hgl? jndiUser)
+    (when (s/hgl? jndiUser)
       (.put vars "jndi.user" jndiUser)
-      (if (hgl? jndiPwd)
+      (if (s/hgl? jndiPwd)
         (.put vars "jndi.password" jndiPwd)))
     (let
       [ctx (InitialContext. vars)
        obj (->> (str connFactory)
-                (.lookup ctx))
-       ^Connection
-       c (condp instance? obj
-           QueueConnectionFactory
-           (inizQueue co ctx obj)
-           TopicConnectionFactory
-           (inizTopic co ctx obj)
-           ConnectionFactory
-           (inizFac co ctx obj))]
-      (if (nil? c)
-        (throwIOE "Unsupported JMS Connection Factory"))
-      (.start c)
-      c)))
+                (.lookup ctx))]
+      (c/do-with
+        [^Connection
+         c (condp instance? obj
+             QueueConnectionFactory
+             (inizQueue co ctx obj)
+             TopicConnectionFactory
+             (inizTopic co ctx obj)
+             ConnectionFactory
+             (inizFac co ctx obj))]
+        (if (nil? c)
+          (c/throwIOE "Unsupported JMS Connection Factory"))
+        (.start c)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(decl-mutable JmsPluglet
+(c/decl-mutable JmsPluglet
   Hierarchical
   (parent [me] (:parent @me))
   Idable
   (id [me] (:emAlias @me))
   LifeCycle
   (init [me arg]
-    (let [k (-> me get-server pkey-chars)
+    (let [k (-> me xp/get-server xp/pkey-chars)
           c (get-in @me [:pspec :conf])]
-      (->> (prevarCfg (sanitize k
-                                (merge c arg)))
-           (setf! me :conf))))
+      (->> (b/prevarCfg (sanitize k
+                                  (merge c arg)))
+           (c/setf! me :conf))))
   (start [me] (.start me nil))
   (start [me arg]
-    (->> (:conf @me) (start2 me) (setf! me :$conn)))
+    (->> (:conf @me) (start2 me) (c/setf! me :$conn)))
   (stop [me]
     (when-some [c (:$conn @me)]
-      (try! (closeQ c))))
+      (c/try! (i/closeQ c))))
   (dispose [me] (.stop me)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -253,10 +254,11 @@
 (defn JMS ""
   ([_ id] (JMS _ id (JMSSpec)))
   ([_ id spec]
-   (mutable<> JmsPluglet
-              {:pspec (update-in spec [:conf] expandVarsInForm)
-               :parent _
-               :emAlias id })))
+   (c/mutable<> JmsPluglet
+                {:pspec (update-in spec
+                                   [:conf] b/expandVarsInForm)
+                 :parent _
+                 :emAlias id })))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF

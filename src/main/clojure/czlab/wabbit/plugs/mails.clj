@@ -11,15 +11,14 @@
 
   czlab.wabbit.plugs.mails
 
-  (:require [czlab.basal.logging :as log])
-
-  (:use [czlab.wabbit.plugs.loops]
-        [czlab.wabbit.plugs.core]
-        [czlab.twisty.codec]
-        [czlab.wabbit.base]
-        [czlab.wabbit.xpis]
-        [czlab.basal.core]
-        [czlab.basal.str])
+  (:require [czlab.wabbit.plugs.loops :as pl]
+            [czlab.wabbit.plugs.core :as pc]
+            [czlab.twisty.codec :as co]
+            [czlab.wabbit.base :as b]
+            [czlab.wabbit.xpis :as xp]
+            [czlab.basal.log :as log]
+            [czlab.basal.core :as c]
+            [czlab.basal.str :as s])
 
   (:import [czlab.jasal Hierarchical LifeCycle Idable]
            [javax.mail.internet MimeMessage]
@@ -62,16 +61,16 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- closeFolder "" [^Folder fd]
-  (if fd (try! (if (.isOpen fd) (.close fd true)))))
+  (if fd (c/trye!! nil (if (.isOpen fd) (.close fd true)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- closeStore "" [co]
   (let [{:keys [store folder]} @co]
     (closeFolder folder)
-    (try! (some-> ^Store store .close))
-    (unsetf! co :store)
-    (unsetf! co :folder)))
+    (c/trye!! nil (some-> ^Store store .close))
+    (c/unsetf! co :store)
+    (c/unsetf! co :folder)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -80,8 +79,8 @@
   [co [^String cz ^String proto]]
 
   (let
-    [mockp (sysProp "wabbit.mock.mail.proto")
-     demo? (hgl? mockp)
+    [mockp (c/sysProp "wabbit.mock.mail.proto")
+     demo? (s/hgl? mockp)
      proto (if demo? mockp proto)
      demop (*mock-mail-provider* (keyword proto))
      ss (-> (doto (Properties.)
@@ -94,24 +93,24 @@
        [(some #(if (= cz (.getClassName ^Provider %)) %)
               (.getProviders ss)) cz])]
     (if (nil? sun)
-      (throwIOE (str "Failed to find store: " pz)))
+      (c/throwIOE (str "Failed to find store: " pz)))
     (log/info "mail store impl = %s" sun)
     (.setProvider ss sun)
-    (copy* co {:proto proto :pz pz :session ss})))
+    (c/copy* co {:proto proto :pz pz :session ss})))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(decl-object MailMsg
-             PlugletMsg
-             (get-pluglet [me] (:$source me)))
+(c/decl-object MailMsg
+               xp/PlugletMsg
+               (get-pluglet [me] (:$source me)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defmacro ^:private evt<> "" [co msg]
-  `(object<> MailMsg
-             {:id (str "MailMsg." (seqint2))
-              :$source ~co
-              :message ~msg }))
+  `(c/object<> MailMsg
+               {:id (str "MailMsg." (c/seqint2))
+                :$source ~co
+                :message ~msg}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -134,18 +133,18 @@
                   host
                   ^long port
                   user
-                  (stror (strit passwd) nil))
-        (copy* co
-               {:store s
-                :folder (some-> (.getDefaultFolder s)
-                                (.getFolder "INBOX"))})
+                  (s/stror (c/strit passwd) nil))
+        (c/copy* co
+                 {:store s
+                  :folder (some-> (.getDefaultFolder s)
+                                  (.getFolder "INBOX"))})
         (let [fd (:folder @co)]
           (when (or (nil? fd)
                     (not (.exists ^Folder fd)))
             (log/warn "mail store folder not-good for proto %s" proto)
-            (unsetf! co :store)
-            (try! (.close s))
-            (throwIOE "cannot find inbox")))))))
+            (c/unsetf! co :store)
+            (c/trye!! nil (.close s))
+            (c/throwIOE "cannot find inbox")))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -156,7 +155,7 @@
       (doto mm
         (.getAllHeaders)
         (.getContent))
-      (dispatch! (evt<> co mm))
+      (pc/dispatch! (evt<> co mm))
       (when d? (.setFlag mm Flags$Flag/DELETED true)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -172,10 +171,10 @@
       (try
         (let [cnt (.getMessageCount folder)]
           (log/debug "count of new mail-messages: %d" cnt)
-          (if (spos? cnt)
+          (if (c/spos? cnt)
             (readPop3 co (.getMessages folder))))
         (finally
-          (try! (.close folder true)))))))
+          (c/trye!! nil (.close folder true)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -184,49 +183,49 @@
   [pkey {:keys [port deleteMsg?
                 host user ssl? passwd] :as cfg0}]
 
-  (-> (assoc cfg0 :ssl? (!false? ssl?))
+  (-> (assoc cfg0 :ssl? (c/!false? ssl?))
       (assoc :deleteMsg? (true? deleteMsg?))
       (assoc :host (str host))
-      (assoc :port (if (spos? port) port 995))
+      (assoc :port (if (c/spos? port) port 995))
       (assoc :user (str user ))
-      (assoc :passwd (p-text (pwd<> passwd pkey)))))
+      (assoc :passwd (co/p-text (co/pwd<> passwd pkey)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(decl-mutable EmailPluglet
+(c/decl-mutable EmailPluglet
   Hierarchical
   (parent [me] (:parent @me))
   Idable
   (id [me] (:emAlias @me))
   LifeCycle
   (init [me arg]
-    (let [k (-> me get-server pkey-chars)
+    (let [k (-> me xp/get-server xp/pkey-chars)
           {:keys [sslvars vars]} @me
           c (get-in @me [:pspec :conf])
-          c2 (prevarCfg (sanitize k (merge c arg)))]
-      (setf! me :conf c2)
+          c2 (b/prevarCfg (sanitize k (merge c arg)))]
+      (c/setf! me :conf c2)
       (resolveProvider me
                        (if (:ssl? c2) sslvars vars))))
   (start [me] (.start me nil))
   (start [me arg]
     (->> (:waker @me)
-         (scheduleThreadedLoop me ) (setf! me :loopy )))
+         (pl/scheduleThreadedLoop me ) (c/setf! me :loopy )))
   (stop [me]
-    (stopThreadedLoop (:loopy @me)))
+    (pl/stopThreadedLoop (:loopy @me)))
   (dispose [me] (.stop me)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- emailXXX "" [_ id spec sslvars vars wakerFunc]
-  (mutable<> EmailPluglet
-             {:pspec (update-in spec
-                                [:conf]
-                                expandVarsInForm)
-              :sslvars sslvars
-              :vars vars
-              :parent _
-              :emAlias id
-              :waker wakerFunc }))
+  (c/mutable<> EmailPluglet
+               {:pspec (update-in spec
+                                  [:conf]
+                                  b/expandVarsInForm)
+                :sslvars sslvars
+                :vars vars
+                :parent _
+                :emAlias id
+                :waker wakerFunc}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

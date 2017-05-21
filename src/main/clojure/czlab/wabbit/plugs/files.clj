@@ -11,16 +11,15 @@
 
   czlab.wabbit.plugs.files
 
-  (:require [czlab.basal.io :refer [mkdirs]]
-            [czlab.basal.logging :as log]
-            [clojure.java.io :as io])
-
-  (:use [czlab.wabbit.plugs.loops]
-        [czlab.wabbit.plugs.core]
-        [czlab.wabbit.base]
-        [czlab.wabbit.xpis]
-        [czlab.basal.core]
-        [czlab.basal.str])
+  (:require [czlab.basal.io :as i :refer [mkdirs]]
+            [czlab.basal.log :as log]
+            [clojure.java.io :as io]
+            [czlab.wabbit.plugs.loops :as pl]
+            [czlab.wabbit.plugs.core :as pc]
+            [czlab.wabbit.base :as b]
+            [czlab.wabbit.xpis :as xp]
+            [czlab.basal.core :as c]
+            [czlab.basal.str :as s])
 
   (:import [czlab.jasal Hierarchical LifeCycle Idable]
            [java.util Timer Properties ResourceBundle]
@@ -41,20 +40,20 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;(set! *warn-on-reflection* false)
 
-(decl-object FileMsg
-             PlugletMsg
-             (get-pluglet [me] (:$source me)))
+(c/decl-object FileMsg
+               xp/PlugletMsg
+               (get-pluglet [me] (:$source me)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defmacro ^:private evt<>
   ""
   [co fname fp action]
-  `(object<> FileMsg
-             {:file (io/file ~fp)
-              :$source ~co
-              :originalFileName ~fname
-              :id (str "FileMsg." (seqint2))}))
+  `(c/object<> FileMsg
+               {:file (io/file ~fp)
+                :$source ~co
+                :originalFileName ~fname
+                :id (str "FileMsg." (c/seqint2))}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -66,9 +65,9 @@
     (when-some
       [cf (if (and (not= action :FP-DELETED)
                    (some? recvFolder))
-            (try! (doto->> (io/file recvFolder orig)
-                           (FileUtils/moveFile f))))]
-      (dispatch! (evt<> plug orig cf action)))))
+            (c/try! (c/doto->> (io/file recvFolder orig)
+                               (FileUtils/moveFile f))))]
+      (pc/dispatch! (evt<> plug orig cf action)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -99,10 +98,10 @@
      root targetFolder
      dest recvFolder
      ff (toFMask (str fmask))]
-    (test-hgl "file-root-folder" root)
+    (c/test-hgl "file-root-folder" root)
     (log/info
       (str "monitoring folder: %s\n"
-           "rcv folder: %s") root (nsn dest))
+           "rcv folder: %s") root (s/nsn dest))
     (merge c2 {:targetFolder root
                :fmask ff
                :recvFolder dest})))
@@ -120,25 +119,25 @@
              ^FileFilter fmask] :as cfg}
      (:conf @plug)
      obs (-> (io/file targetFolder)
-             (FileAlterationObserver. fmask))
-     mon (-> (s2ms intervalSecs)
-             FileAlterationMonitor.)]
-    (->>
-      (proxy [FileAlterationListenerAdaptor][]
-        (onFileCreate [f]
-          (postPoll plug recvFolder f :FP-CREATED))
-        (onFileChange [f]
-          (postPoll plug recvFolder f :FP-CHANGED))
-        (onFileDelete [f]
-          (postPoll plug recvFolder f :FP-DELETED)))
-      (.addListener obs ))
-    (.addObserver mon obs)
-    (.start mon)
-    mon))
+             (FileAlterationObserver. fmask))]
+    (c/do-with
+      [mon (-> (pc/s2ms intervalSecs)
+               FileAlterationMonitor.)]
+      (->>
+        (proxy [FileAlterationListenerAdaptor][]
+          (onFileCreate [f]
+            (postPoll plug recvFolder f :FP-CREATED))
+          (onFileChange [f]
+            (postPoll plug recvFolder f :FP-CHANGED))
+          (onFileDelete [f]
+            (postPoll plug recvFolder f :FP-DELETED)))
+        (.addListener obs ))
+      (.addObserver mon obs)
+      (.start mon))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(decl-mutable FilePickerPluglet
+(c/decl-mutable FilePickerPluglet
   Hierarchical
   (parent [me] (:parent @me))
   Idable
@@ -147,19 +146,19 @@
   (init [me carg]
     (->> (-> (get-in @me [:pspec :conf])
              (init2 carg)
-             (prevarCfg))
-         (setf! me :conf)))
+             (b/prevarCfg))
+         (c/setf! me :conf)))
   (start [me] (.start me nil))
   (start [me arg]
-    (let [w #(->> (fileMon<> me) (setf! me :mon))]
+    (let [w #(->> (fileMon<> me) (c/setf! me :mon))]
       (log/info "apache io monitor starting...")
-      (->> (cfgTimer (Timer. true) w (:conf @me) false)
-           (setf! me :ttask))))
+      (->> (pl/cfgTimer (Timer. true) w (:conf @me) false)
+           (c/setf! me :ttask))))
   (dispose [me]
            (.stop me))
   (stop [me]
     (log/info "apache io monitor stopping...")
-    (cancelTimerTask (:ttask @me))
+    (c/cancelTimerTask (:ttask @me))
     (some-> ^FileAlterationMonitor (:mon @me) .stop)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -187,11 +186,11 @@
 
   ([_ id] (FilePicker _ id (FilePickerSpec)))
   ([_ id spec]
-   (mutable<> FilePickerPluglet
-              {:pspec (update-in spec
-                                 [:conf] expandVarsInForm)
-               :parent _
-               :emAlias id })))
+   (c/mutable<> FilePickerPluglet
+                {:pspec (update-in spec
+                                   [:conf] b/expandVarsInForm)
+                 :parent _
+                 :emAlias id })))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF

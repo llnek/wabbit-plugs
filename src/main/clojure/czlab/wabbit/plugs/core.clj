@@ -11,14 +11,12 @@
 
   czlab.wabbit.plugs.core
 
-  (:require [czlab.basal.meta :refer [getCldr]]
-            [czlab.basal.logging :as log])
-
-  (:use [czlab.wabbit.base]
-        [czlab.wabbit.xpis]
-        [czlab.basal.core]
-        [czlab.basal.meta]
-        [czlab.basal.str])
+  (:require [czlab.basal.meta :as m :refer [getCldr]]
+            [czlab.basal.log :as log]
+            [czlab.wabbit.base :as b]
+            [czlab.wabbit.xpis :as xp]
+            [czlab.basal.core :as c]
+            [czlab.basal.str :as s])
 
   (:import [czlab.jasal Schedulable]
            [czlab.basal Cljrt]
@@ -32,10 +30,10 @@
 (defn- processOrphan ""
   ([evt] (processOrphan evt nil))
   ([evt ^Throwable e]
-   (let [plug (get-pluglet evt)]
+   (let [plug (xp/get-pluglet evt)]
      (some-> e log/exception )
      (log/error (str "event [%s] "
-                     "%s dropped") (gtid evt) (id?? plug)))))
+                     "%s dropped") (b/gtid evt) (c/id?? plug)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -43,18 +41,18 @@
   "Convert seconds to milliseconds"
   {:no-doc true}
   [s]
-  `(let [t# ~s] (if (spos?  t#) (* 1000 t#) 0)))
+  `(let [t# ~s] (if (czlab.basal.core/spos?  t#) (* 1000 t#) 0)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn- error!
   "" [evt e]
   (let [plug (:source evt)]
-    (if-some+
-      [r (strKW (get-in @plug [:pspec :error]))]
+    (c/if-some+
+      [r (s/strKW (get-in @plug [:pspec :error]))]
       (.callEx ^Cljrt
                (-> plug
-                   get-server cljrt) r (vargs* Object evt e)))))
+                   xp/get-server xp/cljrt) r (c/vargs* Object evt e)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -62,23 +60,23 @@
   ([evt] (dispatch! evt nil))
   ([evt arg]
    (let
-     [pid (str "disp#" (seqint2))
-      plug (get-pluglet evt)
+     [pid (str "disp#" (c/seqint2))
+      plug (xp/get-pluglet evt)
       cfg (:conf @plug)
-      ctr (get-server plug)
-      sc (get-scheduler ctr)
-      clj (cljrt ctr)
+      ctr (xp/get-server plug)
+      sc (xp/get-scheduler ctr)
+      clj (xp/cljrt ctr)
       dsp (:dispfn arg)
       h (or (:handler arg)
             (:handler cfg))
       f (if (var? h) @h)]
-     (do->nil
-       (log/debug "plug = %s\narg = %s\ncb = %s" (gtid plug) arg h)
-       (log/debug "#%s => %s :is disp!" (id?? evt) (id?? plug))
+     (c/do->nil
+       (log/debug "plug = %s\narg = %s\ncb = %s" (b/gtid plug) arg h)
+       (log/debug "#%s => %s :is disp!" (c/id?? evt) (c/id?? plug))
        (if (fn? f)
          (->> (if (fn? dsp)
-                (run-able+id<> pid (dsp f evt))
-                (run-able+id<> pid (f evt)))
+                (c/run-able+id<> pid (dsp f evt))
+                (c/run-able+id<> pid (f evt)))
               (.run ^Schedulable sc ))
          (processOrphan evt))))))
 

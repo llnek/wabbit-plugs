@@ -11,14 +11,13 @@
 
   czlab.wabbit.shiro.model
 
-  (:require [czlab.basal.resources :refer [rstr]]
-            [czlab.basal.io :refer [spitUtf8]]
-            [czlab.basal.str :refer [toKW]]
-            [czlab.basal.logging :as log])
-
-  (:use [czlab.horde.drivers]
-        [czlab.basal.core]
-        [czlab.horde.core])
+  (:require [czlab.basal.resources :as r :refer [rstr]]
+            [czlab.basal.io :as i :refer [spitUtf8]]
+            [czlab.basal.str :as s :refer [toKW]]
+            [czlab.basal.log :as log]
+            [czlab.horde.drivers :as hd]
+            [czlab.basal.core :as c]
+            [czlab.horde.core :as hc])
 
   (:import [java.sql Connection]
            [java.io File]
@@ -32,39 +31,39 @@
 (def
   ^:dynamic
   *auth-meta-cache*
-  (dbschema<>
-    (dbmodel<> ::StdAddress
-      (dbfields
+  (hc/dbschema<>
+    (hc/dbmodel<> ::StdAddress
+      (hc/dbfields
         {:addr1 {:size 255 :null false}
          :addr2 {}
          :state {:null false}
          :city {:null false}
          :zip {:null false}
          :country {:null false}})
-      (dbindexes
+      (hc/dbindexes
         {:i1 #{:city :state :country}
          :i2 #{:zip :country}
          :state #{:state}
          :zip #{:zip}}))
-    (dbmodel<> ::AuthRole
-      (dbfields
+    (hc/dbmodel<> ::AuthRole
+      (hc/dbfields
         {:name {:column "role_name" :null false}
          :desc {:column "description" :null false}})
-      (dbuniques
+      (hc/dbuniques
         {:u1 #{:name}}))
-    (dbmodel<> ::LoginAccount
-      (dbfields
+    (hc/dbmodel<> ::LoginAccount
+      (hc/dbfields
         {:acctid {:null false}
          :email {:size 128}
           ;;:salt { :size 128}
          :passwd {:null false :domain :Password}})
-      (dbassocs
+      (hc/dbassocs
         {:addr {:kind :o2o
                 :cascade true
                 :other ::StdAddress}})
-      (dbuniques
+      (hc/dbuniques
         {:u2 #{:acctid}}))
-    (dbjoined<> ::AccountRoles ::LoginAccount ::AuthRole)))
+    (hc/dbjoined<> ::AccountRoles ::LoginAccount ::AuthRole)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -75,37 +74,28 @@
   [spec]
   {:pre [(keyword? spec)]}
 
-  (if (in? *db-types* spec)
-    (getDdl *auth-meta-cache* spec)
-    (dberr! (rstr (I18N/base) "db.unknown" (name spec)))))
+  (if (c/in? hc/*db-types* spec)
+    (hd/getDdl *auth-meta-cache* spec)
+    (hc/dberr! (r/rstr (I18N/base) "db.unknown" (name spec)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defmulti applyDDL "" (fn [a] (class a)))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-(defmethod applyDDL
-  czlab.horde.core.JdbcSpec
-  [spec]
-  (when-some [t (matchUrl (:url spec))]
-    (with-open [c (dbconnect<> spec)]
-      (uploadDdl c (genAuthPlugletDDL t)))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-(defmethod applyDDL
-  czlab.horde.core.JdbcPool
-  [pool]
-  (when-some [t (matchUrl (:url (:jdbc pool)))]
-    (uploadDdl pool (genAuthPlugletDDL t))))
+(defn applyDDL "" [arg]
+  (cond
+    (c/ist? czlab.horde.core.JdbcSpec arg)
+    (when-some [t (hc/matchUrl (:url arg))]
+      (with-open [c (hc/dbconnect<> arg)]
+        (hc/uploadDdl c (genAuthPlugletDDL t))))
+    (c/ist? czlab.horde.core.JdbcPool arg)
+    (when-some [t (hc/matchUrl (:url (:jdbc arg)))]
+      (hc/uploadDdl arg (genAuthPlugletDDL t)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 (defn exportAuthPlugletDDL
   "Output the auth-plugin ddl to file"
   [spec file]
-  (spitUtf8 file (genAuthPlugletDDL spec)))
+  (i/spitUtf8 file (genAuthPlugletDDL spec)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF
