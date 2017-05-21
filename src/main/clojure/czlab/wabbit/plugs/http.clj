@@ -193,14 +193,17 @@
        (-> {:hh1
             (fn [ctx msg]
               (let [ev (evt<> co (nc/ch?? ctx) msg)
-                    {:keys [static? handler]}
+                    {:keys [static? handler]
+                     :as rcfg}
                     (get-in msg [:route :info])
+                    _ (log/debug "route info= %s" rcfg)
                     hd (if (and static?
                                 (nil? handler)) asset! handler)]
                 ;;(if (spos? waitMillis) (hold-event co ev waitMillis))
                 (pc/dispatch! ev
                               {:handler hd
                                :dispfn (funky ev)})))}
+           (merge cfg)
            sv/nettyWebServer<>)])))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
