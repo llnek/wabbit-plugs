@@ -188,6 +188,7 @@
     [asset! #'czlab.wabbit.plugs.mvc/assetLoader
      {:keys [waitMillis] :as cfg}
      (:conf @co)]
+    (log/debug "boot! http-plug: %s" cfg)
     (c/do-with
       [w
        (-> {:hh1
