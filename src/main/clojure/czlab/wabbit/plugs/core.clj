@@ -27,13 +27,23 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
+(defn error!
+  "" [evt e]
+  (let [plug (xp/get-pluglet evt)
+        e (or (:error (:conf @plug))
+              (get-in @plug [:pspec :error]))]
+    (if (var? e)
+      (@e evt e)
+      (do
+        (some-> e log/exception )
+        (log/error (str "event [%s] "
+                        "%s dropped") (b/gtid evt) (c/id?? plug))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
 (defn- processOrphan ""
   ([evt] (processOrphan evt nil))
-  ([evt ^Throwable e]
-   (let [plug (xp/get-pluglet evt)]
-     (some-> e log/exception )
-     (log/error (str "event [%s] "
-                     "%s dropped") (b/gtid evt) (c/id?? plug)))))
+  ([evt ^Throwable e] (error! evt e)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -42,17 +52,6 @@
   {:no-doc true}
   [s]
   `(let [t# ~s] (if (czlab.basal.core/spos?  t#) (* 1000 t#) 0)))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-(defn- error!
-  "" [evt e]
-  (let [plug (:source evt)]
-    (c/if-some+
-      [r (s/strKW (get-in @plug [:pspec :error]))]
-      (.callEx ^Cljrt
-               (-> plug
-                   xp/get-server xp/cljrt) r (c/vargs* Object evt e)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

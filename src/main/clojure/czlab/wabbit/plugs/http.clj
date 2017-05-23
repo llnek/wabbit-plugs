@@ -194,16 +194,20 @@
        (-> {:hh1
             (fn [ctx msg]
               (let [ev (evt<> co (nc/ch?? ctx) msg)
+                    {:keys [route uri2]} msg
+                    ok? (:status? route)
                     {:keys [static? handler]
                      :as rcfg}
-                    (get-in msg [:route :info])
-                    _ (log/debug "route info= %s" rcfg)
+                    (:info route)
+                    _ (log/debug "route status= %s, info= %s" ok? rcfg)
                     hd (if (and static?
                                 (nil? handler)) asset! handler)]
                 ;;(if (spos? waitMillis) (hold-event co ev waitMillis))
-                (pc/dispatch! ev
-                              {:handler hd
-                               :dispfn (funky ev)})))}
+                (if-not ok?
+                  (pc/error! ev (Exception. (str "bad route uri: " uri2)))
+                  (pc/dispatch! ev
+                                {:handler hd
+                                 :dispfn (funky ev)}))))}
            (merge cfg)
            sv/nettyWebServer<>)])))
 
@@ -212,6 +216,7 @@
 (defn processOrphan
   "" [evt error]
   ;; 500 or 503
+  (log/warn "processing orphan/error event: %s" error)
   (let [ch (:socket evt)] (nc/replyStatus ch 500)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -226,12 +231,12 @@
 (defn- basicfg
 
   "Basic http config"
-  [pkey conf cfg0]
+  [svr pkey conf cfg0]
 
-  (let [{:keys [serverKey
-                port
-                passwd] :as cfg}
+  (let [{:keys [serverKey passwd
+                error port] :as cfg}
         (merge conf cfg0)
+        clj (xp/cljrt svr)
         ssl? (s/hgl? serverKey)]
     (if ssl?
       (c/test-cond "server-key file url"
@@ -239,6 +244,7 @@
     (merge cfg
            {:port (if-not (c/spos? port) (if ssl? 443 80) port)
             :routes (maybeLoadRoutes cfg)
+            :error (if error (.varIt clj (s/strKW error)))
             :passwd (co/p-text (co/pwd<> passwd pkey))
             :serverKey (if ssl? (io/as-url serverKey))})))
 
@@ -251,15 +257,18 @@
   (id [me] (:emAlias @me))
   LifeCycle
   (init [me arg]
-    (let [k (-> me xp/get-server xp/pkey-chars)
+    (let [svr (xp/get-server me)
+          k (xp/pkey-chars svr)
           c (get-in @me [:pspec :conf])
-          cfg (b/prevarCfg (basicfg k c arg))
+          cfg (b/prevarCfg (basicfg svr k c arg))
           {:keys [publicRootDir pageDir]}
           (:wsite cfg)
           pub (io/file (str publicRootDir)
                        (str pageDir))]
+      (log/info "http-plug: page-dir= %s" pageDir)
+      (log/info "http-plug: pub-dir= %s" pub)
       (when (i/dirReadWrite? pub)
-        (log/debug "freemarker tpl root: %s" (c/fpath pub))
+        (log/debug "**Freemarker** tpl root: %s" (c/fpath pub))
         (c/setf! me :ftlCfg (mvc/genFtlConfig {:root pub})))
       (c/setf! me :conf cfg)))
   (start [me] (.start me nil))
@@ -290,7 +299,7 @@
           :port 9090
           :serverKey ""
           :passwd ""
-          :errorHandler nil
+          :error nil
           :handler nil
           :useETags? false
           :wsockPath ""
@@ -327,13 +336,17 @@
 ;;
 (defn HTTP ""
   ([_ id] (HTTP _ id (HTTPSpec)))
-  ([_ id spec]
-   (c/mutable<> HttpPluglet
-                {:pspec (update-in spec
-                                   [:conf] b/expandVarsInForm)
-                 :parent _
-                 :emAlias id
-                 :timer (Timer. true)})))
+  ([co id spec]
+   (with-open [clj (xp/cljrt co)]
+     (let [pspec (update-in spec
+                            [:conf] b/expandVarsInForm)
+           e (:error pspec)
+           e (if e (.varIt clj (s/strKW e)))]
+       (c/mutable<> HttpPluglet
+                    {:pspec (assoc pspec :error e)
+                     :parent co
+                     :emAlias id
+                     :timer (Timer. true)})))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;EOF
