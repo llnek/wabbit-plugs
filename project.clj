@@ -5,7 +5,7 @@
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
 
-  :description ""
+  :description "Built-in pluggables for the wabbit framework"
   :url "https://github.com/llnek/wabbit-plugs"
 
   :dependencies

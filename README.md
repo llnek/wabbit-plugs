@@ -1,5 +1,5 @@
 # wabbit-plugs
-Pluggables for wabbit
+"Built-in pluggables for the wabbit framework
 
 [![Build Status](https://travis-ci.org/llnek/wabbit-plugs.svg?branch=master)](https://travis-ci.org/llnek/wabbit-plugs)
 
