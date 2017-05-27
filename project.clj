@@ -10,8 +10,6 @@
 
   :dependencies
   [[org.apache.geronimo.specs/geronimo-jms_1.1_spec "1.1.1"]
-   ;;[com.github.spullara.mustache.java/compiler "0.9.4" ]
-   ;;[com.google.code.findbugs/jsr305 "3.0.1"]
    [org.freemarker/freemarker "2.3.26-incubating"]
    [commons-net/commons-net "3.6"]
    [org.apache.shiro/shiro-core "1.4.0"]
@@ -19,7 +17,6 @@
    [io.czlab/wabbit "1.0.0"]]
 
   :plugins [[cider/cider-nrepl "0.14.0"]
-            [lein-javadoc "0.3.0"]
             [lein-codox "0.10.3"]
             [lein-cprint "1.2.0"]]
 

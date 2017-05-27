@@ -164,6 +164,7 @@
             s (xp/plugletViaType<> ctr etype "t")]
         (.init s
                {:handler #'czlab.test.wabbit.plugs.svcs/httpHandler
+                :routes nil
                 :host "localhost"
                 :port 8888})
         (.start s)
