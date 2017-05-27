@@ -25,9 +25,6 @@
                          [io.czlab/proto "1.0.0" :scope "test"]]}
              :uberjar {:aot :all}}
 
-  :javadoc-opts {:package-names ["czlab.wabbit"]
-                 :output-dir "docs"}
-
   :global-vars {*warn-on-reflection* true}
   :target-path "out/%s"
   :aot :all
