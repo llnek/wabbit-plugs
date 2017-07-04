@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-(defproject io.czlab/wabbit-plugs "1.0.0"
+(defproject io.czlab/wabbit-plugs "1.0.1"
 
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
@@ -13,7 +13,7 @@
    [org.freemarker/freemarker "2.3.26-incubating"]
    [commons-net/commons-net "3.6"]
    [org.apache.shiro/shiro-core "1.4.0"]
-   [io.czlab/nettio "1.0.0"]
+   [io.czlab/nettio "1.1.1"]
    [io.czlab/wabbit "1.0.0"]]
 
   :plugins [[cider/cider-nrepl "0.14.0"]

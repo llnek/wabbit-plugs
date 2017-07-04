@@ -7,7 +7,7 @@
 
 Add the following dependency to your `project.clj` file:
 
-    [io.czlab/wabbit-plugs "1.0.0"]
+    [io.czlab/wabbit-plugs "1.0.1"]
 
 ## Documentation
 
